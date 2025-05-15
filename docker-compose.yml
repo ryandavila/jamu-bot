@@ -1,0 +1,11 @@
+services:
+  jamu-bot:
+    build: .
+    container_name: jamu-bot
+    volumes:
+      - .:/app
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    command: python bot.py
+    network_mode: host
+    restart: unless-stopped
