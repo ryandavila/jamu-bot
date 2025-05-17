@@ -458,13 +458,23 @@ class Quotes(commands.Cog):
 
     def _create_quote_embed(self, quote):
         """Create a Discord embed for a quote."""
-        embed = discord.Embed(
-            title=f"Quote #{quote['id']}",
-            description=f'"{quote["content"]}"',
-            color=discord.Color.blue(),
+        # Use a warm purple color for a more elegant look
+        embed = discord.Embed(color=discord.Color.from_rgb(147, 112, 219))
+
+        # Add the quote with stylized formatting
+        embed.description = f"❝ {quote['content']} ❞"
+
+        # Add author with a decorative separator
+        embed.add_field(name="", value=f"― *{quote['author']}*", inline=False)
+
+        # Format the date in a cleaner way
+        date_added = datetime.datetime.strptime(
+            quote["date_added"], "%Y-%m-%d %H:%M:%S"
         )
-        embed.set_author(name=quote["author"])
-        embed.set_footer(text=f"Added on {quote['date_added']}")
+        formatted_date = date_added.strftime("%B %d, %Y")
+
+        # Add a subtle footer with quote ID and date
+        embed.set_footer(text=f"Quote #{quote['id']} • {formatted_date}")
 
         return embed
 
