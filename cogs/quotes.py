@@ -1,98 +1,122 @@
+import csv
+import datetime
+from io import StringIO
+from pathlib import Path
+from typing import Any
+
+import aiosqlite
 import discord
 from discord.ext import commands
-import aiosqlite
-import random
-import datetime
-from pathlib import Path
-from typing import Optional, Union
 
 
 class Quotes(commands.Cog):
     """A cog for managing and retrieving quotes."""
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.db_path = Path("data/quotes.db")
-        self.bot.loop.create_task(self.setup_db())
+        self.db_path.parent.mkdir(exist_ok=True)
 
-    async def setup_db(self):
-        """Set up the SQLite database."""
+    async def cog_load(self) -> None:
+        """Initialize the database when the cog is loaded."""
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS quotes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     content TEXT NOT NULL,
                     author TEXT NOT NULL,
                     added_by INTEGER NOT NULL,
                     guild_id INTEGER NOT NULL,
-                    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """)
+                """
+            )
             await db.commit()
 
-    @commands.group(name="quote", invoke_without_command=True)
-    async def quote(self, ctx):
-        """Get a random quote from the database."""
+    def _create_quote_embed(self, quote: dict[str, Any]) -> discord.Embed:
+        """Create a Discord embed for a quote."""
+        embed = discord.Embed(
+            description=f'"{quote["content"]}"',
+            color=discord.Color.blue(),
+            timestamp=datetime.datetime.fromisoformat(quote["created_at"]),
+        )
+        embed.set_author(name=quote["author"])
+        embed.set_footer(text=f"Quote #{quote['id']}")
+        return embed
+
+    @commands.hybrid_group(name="quote", invoke_without_command=True)  # type: ignore[arg-type]
+    async def quote(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Get a random quote."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
                 "SELECT * FROM quotes WHERE guild_id = ? ORDER BY RANDOM() LIMIT 1",
                 (ctx.guild.id,),
             )
-            quote = await cursor.fetchone()
-
-            if quote:
-                embed = self._create_quote_embed(quote)
+            quote_row = await cursor.fetchone()
+            if quote_row:
+                quote_dict = dict(quote_row)
+                embed = self._create_quote_embed(quote_dict)
                 await ctx.send(embed=embed)
             else:
                 await ctx.send(
-                    "No quotes found! Add some with `!quote add <quote> - <author>`"
+                    "No quotes found! Add some quotes with `!quote add <quote> - <author>`."
                 )
 
-    @quote.command(name="add")
-    async def add_quote(self, ctx, *, content: str = None):
+    @quote.command(name="add")  # type: ignore[arg-type]
+    async def add_quote(
+        self, ctx: commands.Context[commands.Bot], *, content: str | None = None
+    ) -> None:
         """Add a new quote to the database.
 
         Format: !quote add <quote> - <author>
-        Example: !quote add The way to get started is to quit talking and begin doing. - Walt Disney
-
-        You can also reply to a message to quote it:
-        Example: (reply to a message) !quote add
+        Or reply to a message with !quote add
         """
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         # Check if this is a reply to another message
         if ctx.message.reference and not content:
             # Get the message being replied to
-            try:
-                referenced_message = await ctx.fetch_message(
-                    ctx.message.reference.message_id
-                )
-                quote_text = referenced_message.content
-                author = referenced_message.author.display_name
-
-                # Handle empty messages (e.g., only attachments)
-                if not quote_text:
-                    await ctx.send(
-                        "The message you're replying to doesn't have any text content."
+            if ctx.message.reference.message_id is not None:
+                try:
+                    referenced_message = await ctx.channel.fetch_message(
+                        ctx.message.reference.message_id
                     )
+                    quote_text = referenced_message.content
+                    author = referenced_message.author.display_name
+
+                    if not quote_text:
+                        await ctx.send("The referenced message has no content to quote.")
+                        return
+
+                    await self._add_quote_to_db(ctx, quote_text, author)
+                    return
+                except discord.NotFound:
+                    await ctx.send("Could not find the referenced message.")
+                    return
+                except discord.Forbidden:
+                    await ctx.send("I don't have permission to access that message.")
                     return
 
-                # Add the quote
-                await self._add_quote_to_db(ctx, quote_text, author)
-
-            except discord.NotFound:
-                await ctx.send("I couldn't find the message you replied to.")
-            except Exception as e:
-                await ctx.send(f"An error occurred: {str(e)}")
-            return
-
-        # Handle manual quote addition
+        # Handle manual quote input
         if not content:
-            await ctx.send("Please provide a quote or reply to a message to quote it.")
+            await ctx.send(
+                "Please provide a quote in the format: `!quote add <quote> - <author>` "
+                "or reply to a message with `!quote add`"
+            )
             return
 
+        # Parse the quote and author
         if " - " not in content:
             await ctx.send(
-                "Invalid format. Use `!quote add <quote> - <author>` or reply to a message."
+                "Please use the format: `!quote add <quote> - <author>`"
             )
             return
 
@@ -101,13 +125,21 @@ class Quotes(commands.Cog):
         author = author.strip()
 
         if not quote_text or not author:
-            await ctx.send("Both quote and author must be provided.")
+            await ctx.send(
+                "Both quote and author must be provided. Format: `!quote add <quote> - <author>`"
+            )
             return
 
         await self._add_quote_to_db(ctx, quote_text, author)
 
-    async def _add_quote_to_db(self, ctx, quote_text: str, author: str):
+    async def _add_quote_to_db(
+        self, ctx: commands.Context[commands.Bot], quote_text: str, author: str
+    ) -> None:
         """Helper method to add a quote to the database."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
@@ -117,47 +149,60 @@ class Quotes(commands.Cog):
 
         await ctx.send(f"Quote by {author} has been added!")
 
-    @quote.command(name="list")
-    async def list_quotes(self, ctx, *, author: str = None):
+    @quote.command(name="list")  # type: ignore[arg-type]
+    async def list_quotes(
+        self, ctx: commands.Context[commands.Bot], *, author: str | None = None
+    ) -> None:
         """List quotes, optionally filtered by author.
 
         Usage:
         !quote list - List all quotes
-        !quote list <author> - List quotes by a specific author
+        !quote list <author> - List quotes by specific author
         """
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
 
             if author:
                 cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? AND LOWER(author) LIKE ? ORDER BY id",
-                    (ctx.guild.id, f"%{author.lower()}%"),
+                    "SELECT * FROM quotes WHERE guild_id = ? AND author LIKE ? ORDER BY created_at DESC",
+                    (ctx.guild.id, f"%{author}%"),
                 )
             else:
                 cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? ORDER BY id",
+                    "SELECT * FROM quotes WHERE guild_id = ? ORDER BY created_at DESC",
                     (ctx.guild.id,),
                 )
 
-            quotes = await cursor.fetchall()
+            quotes_rows = await cursor.fetchall()
+            quotes = [dict(row) for row in quotes_rows]
 
             if not quotes:
                 if author:
-                    await ctx.send(f"No quotes found by author matching '{author}'.")
+                    await ctx.send(f"No quotes found for author '{author}'.")
                 else:
-                    await ctx.send("No quotes found in the database.")
+                    await ctx.send("No quotes found.")
                 return
 
-            # Create a paginated list of quotes
-            quote_pages = []
-            page_size = 5
+            # Pagination
+            quotes_per_page = 5
+            total_pages = (len(quotes) + quotes_per_page - 1) // quotes_per_page
+            current_page = 0
 
-            for i in range(0, len(quotes), page_size):
-                page_quotes = quotes[i : i + page_size]
-                embed = discord.Embed(
-                    title=f"Quotes {i + 1}-{min(i + page_size, len(quotes))} of {len(quotes)}",
-                    color=discord.Color.blue(),
-                )
+            def create_page_embed(page: int) -> discord.Embed:
+                start_idx = page * quotes_per_page
+                end_idx = min(start_idx + quotes_per_page, len(quotes))
+                page_quotes = quotes[start_idx:end_idx]
+
+                if author:
+                    title = f"Quotes by {author} (Page {page + 1}/{total_pages})"
+                else:
+                    title = f"All Quotes (Page {page + 1}/{total_pages})"
+
+                embed = discord.Embed(title=title, color=discord.Color.blue())
 
                 for quote in page_quotes:
                     embed.add_field(
@@ -166,18 +211,18 @@ class Quotes(commands.Cog):
                         inline=False,
                     )
 
-                quote_pages.append(embed)
+                return embed
 
-            # Send the first page
-            current_page = 0
-            message = await ctx.send(embed=quote_pages[current_page])
-
-            # Add reactions for pagination if there are multiple pages
-            if len(quote_pages) > 1:
+            if total_pages == 1:
+                await ctx.send(embed=create_page_embed(0))
+            else:
+                message = await ctx.send(embed=create_page_embed(current_page))
                 await message.add_reaction("⬅️")
                 await message.add_reaction("➡️")
 
-                def check(reaction, user):
+                def check(
+                    reaction: discord.Reaction, user: discord.Member | discord.User
+                ) -> bool:
                     return (
                         user == ctx.author
                         and str(reaction.emoji) in ["⬅️", "➡️"]
@@ -190,63 +235,77 @@ class Quotes(commands.Cog):
                             "reaction_add", timeout=60.0, check=check
                         )
 
-                        if (
-                            str(reaction.emoji) == "➡️"
-                            and current_page < len(quote_pages) - 1
-                        ):
+                        if str(reaction.emoji) == "➡️" and current_page < total_pages - 1:
                             current_page += 1
-                            await message.edit(embed=quote_pages[current_page])
-                            await message.remove_reaction(reaction, user)
-
+                            await message.edit(embed=create_page_embed(current_page))
                         elif str(reaction.emoji) == "⬅️" and current_page > 0:
                             current_page -= 1
-                            await message.edit(embed=quote_pages[current_page])
+                            await message.edit(embed=create_page_embed(current_page))
+
+                        # Remove the user's reaction
+                        if isinstance(user, discord.Member | discord.User):
                             await message.remove_reaction(reaction, user)
 
-                        else:
-                            await message.remove_reaction(reaction, user)
-
-                    except:
+                    except Exception:
                         break
 
-    @quote.command(name="get")
-    async def get_quote(self, ctx, quote_id: int):
+    @quote.command(name="get")  # type: ignore[arg-type]
+    async def get_quote(
+        self, ctx: commands.Context[commands.Bot], quote_id: int
+    ) -> None:
         """Get a specific quote by its ID."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
                 "SELECT * FROM quotes WHERE id = ? AND guild_id = ?",
                 (quote_id, ctx.guild.id),
             )
-            quote = await cursor.fetchone()
+            quote_row = await cursor.fetchone()
 
-            if quote:
-                embed = self._create_quote_embed(quote)
+            if quote_row:
+                quote_dict = dict(quote_row)
+                embed = self._create_quote_embed(quote_dict)
                 await ctx.send(embed=embed)
             else:
                 await ctx.send(f"Quote with ID {quote_id} not found.")
 
-    @quote.command(name="delete", aliases=["remove"])
-    async def delete_quote(self, ctx, quote_id: int):
+    @quote.command(name="delete", aliases=["remove"])  # type: ignore[arg-type]
+    async def delete_quote(
+        self, ctx: commands.Context[commands.Bot], quote_id: int
+    ) -> None:
         """Delete a quote by its ID. Only the quote adder or admins can delete quotes."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
                 "SELECT * FROM quotes WHERE id = ? AND guild_id = ?",
                 (quote_id, ctx.guild.id),
             )
-            quote = await cursor.fetchone()
+            quote_row = await cursor.fetchone()
 
-            if not quote:
+            if not quote_row:
                 await ctx.send(f"Quote with ID {quote_id} not found.")
                 return
 
-            # Check if user is the one who added the quote or has admin permissions
-            if (
-                quote["added_by"] != ctx.author.id
-                and not ctx.author.guild_permissions.administrator
-            ):
-                await ctx.send("You don't have permission to delete this quote.")
+            quote_dict = dict(quote_row)
+
+            # Check permissions
+            if isinstance(ctx.author, discord.Member):
+                is_admin = ctx.author.guild_permissions.administrator
+            else:
+                is_admin = False
+
+            is_quote_adder = quote_dict["added_by"] == ctx.author.id
+
+            if not (is_admin or is_quote_adder):
+                await ctx.send("You can only delete quotes you added or you must be an admin.")
                 return
 
             await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
@@ -254,33 +313,40 @@ class Quotes(commands.Cog):
 
             await ctx.send(f"Quote #{quote_id} has been deleted.")
 
-    @quote.command(name="search")
-    async def search_quotes(self, ctx, *, search_term: str):
+    @quote.command(name="search")  # type: ignore[arg-type]
+    async def search_quotes(
+        self, ctx: commands.Context[commands.Bot], *, search_term: str
+    ) -> None:
         """Search for quotes containing the given text."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
-                "SELECT * FROM quotes WHERE guild_id = ? AND (LOWER(content) LIKE ? OR LOWER(author) LIKE ?)",
-                (ctx.guild.id, f"%{search_term.lower()}%", f"%{search_term.lower()}%"),
+                "SELECT * FROM quotes WHERE guild_id = ? AND (content LIKE ? OR author LIKE ?) ORDER BY created_at DESC",
+                (ctx.guild.id, f"%{search_term}%", f"%{search_term}%"),
             )
-            quotes = await cursor.fetchall()
+            quotes_rows = await cursor.fetchall()
+            quotes = [dict(row) for row in quotes_rows]
 
             if not quotes:
-                await ctx.send(f"No quotes found matching '{search_term}'.")
+                await ctx.send(f"No quotes found containing '{search_term}'.")
                 return
 
-            await ctx.send(f"Found {len(quotes)} quotes matching '{search_term}':")
+            # Pagination
+            quotes_per_page = 5
+            total_pages = (len(quotes) + quotes_per_page - 1) // quotes_per_page
+            current_page = 0
 
-            # Create a paginated list of quotes
-            quote_pages = []
-            page_size = 5
+            def create_page_embed(page: int) -> discord.Embed:
+                start_idx = page * quotes_per_page
+                end_idx = min(start_idx + quotes_per_page, len(quotes))
+                page_quotes = quotes[start_idx:end_idx]
 
-            for i in range(0, len(quotes), page_size):
-                page_quotes = quotes[i : i + page_size]
-                embed = discord.Embed(
-                    title=f"Search Results {i + 1}-{min(i + page_size, len(quotes))} of {len(quotes)}",
-                    color=discord.Color.green(),
-                )
+                title = f"Search Results for '{search_term}' (Page {page + 1}/{total_pages})"
+                embed = discord.Embed(title=title, color=discord.Color.green())
 
                 for quote in page_quotes:
                     embed.add_field(
@@ -289,18 +355,18 @@ class Quotes(commands.Cog):
                         inline=False,
                     )
 
-                quote_pages.append(embed)
+                return embed
 
-            # Send the first page
-            current_page = 0
-            message = await ctx.send(embed=quote_pages[current_page])
-
-            # Add reactions for pagination if there are multiple pages
-            if len(quote_pages) > 1:
+            if total_pages == 1:
+                await ctx.send(embed=create_page_embed(0))
+            else:
+                message = await ctx.send(embed=create_page_embed(current_page))
                 await message.add_reaction("⬅️")
                 await message.add_reaction("➡️")
 
-                def check(reaction, user):
+                def check(
+                    reaction: discord.Reaction, user: discord.Member | discord.User
+                ) -> bool:
                     return (
                         user == ctx.author
                         and str(reaction.emoji) in ["⬅️", "➡️"]
@@ -313,35 +379,36 @@ class Quotes(commands.Cog):
                             "reaction_add", timeout=60.0, check=check
                         )
 
-                        if (
-                            str(reaction.emoji) == "➡️"
-                            and current_page < len(quote_pages) - 1
-                        ):
+                        if str(reaction.emoji) == "➡️" and current_page < total_pages - 1:
                             current_page += 1
-                            await message.edit(embed=quote_pages[current_page])
-                            await message.remove_reaction(reaction, user)
-
+                            await message.edit(embed=create_page_embed(current_page))
                         elif str(reaction.emoji) == "⬅️" and current_page > 0:
                             current_page -= 1
-                            await message.edit(embed=quote_pages[current_page])
+                            await message.edit(embed=create_page_embed(current_page))
+
+                        # Remove the user's reaction
+                        if isinstance(user, discord.Member | discord.User):
                             await message.remove_reaction(reaction, user)
 
-                        else:
-                            await message.remove_reaction(reaction, user)
-
-                    except:
+                    except Exception:
                         break
 
-    @quote.command(name="random")
-    async def random_quote(self, ctx, *, author: str = None):
+    @quote.command(name="random")  # type: ignore[arg-type]
+    async def random_quote(
+        self, ctx: commands.Context[commands.Bot], *, author: str | None = None
+    ) -> None:
         """Get a random quote, optionally filtered by author."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
 
             if author:
                 cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? AND LOWER(author) LIKE ? ORDER BY RANDOM() LIMIT 1",
-                    (ctx.guild.id, f"%{author.lower()}%"),
+                    "SELECT * FROM quotes WHERE guild_id = ? AND author LIKE ? ORDER BY RANDOM() LIMIT 1",
+                    (ctx.guild.id, f"%{author}%"),
                 )
             else:
                 cursor = await db.execute(
@@ -349,146 +416,123 @@ class Quotes(commands.Cog):
                     (ctx.guild.id,),
                 )
 
-            quote = await cursor.fetchone()
-
-            if quote:
-                embed = self._create_quote_embed(quote)
+            quote_row = await cursor.fetchone()
+            if quote_row:
+                quote_dict = dict(quote_row)
+                embed = self._create_quote_embed(quote_dict)
                 await ctx.send(embed=embed)
             else:
                 if author:
-                    await ctx.send(f"No quotes found by author matching '{author}'.")
+                    await ctx.send(f"No quotes found for author '{author}'.")
                 else:
-                    await ctx.send("No quotes found in the database.")
+                    await ctx.send("No quotes found.")
 
-    @quote.command(name="export")
+    @quote.command(name="export")  # type: ignore[arg-type]
     @commands.has_permissions(administrator=True)
-    async def export_quotes(self, ctx):
-        """Export all quotes to a CSV file (admin only)."""
-        import csv
-        from io import StringIO
+    async def export_quotes(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Export all quotes to a CSV file. Admin only."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
 
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
-                "SELECT * FROM quotes WHERE guild_id = ? ORDER BY id", (ctx.guild.id,)
+                "SELECT id, content, author, added_by, created_at FROM quotes WHERE guild_id = ? ORDER BY id",
+                (ctx.guild.id,),
             )
-            quotes = await cursor.fetchall()
+            quotes_rows = await cursor.fetchall()
 
-            if not quotes:
+            if not quotes_rows:
                 await ctx.send("No quotes to export.")
                 return
 
-            # Create CSV in memory
+            # Create CSV content
             output = StringIO()
             writer = csv.writer(output)
-            writer.writerow(["ID", "Quote", "Author", "Added By", "Date Added"])
+            writer.writerow(["ID", "Content", "Author", "Added By", "Created At"])
 
-            for quote in quotes:
-                writer.writerow(
-                    [
-                        quote["id"],
-                        quote["content"],
-                        quote["author"],
-                        quote["added_by"],
-                        quote["date_added"],
-                    ]
-                )
+            for quote_row in quotes_rows:
+                quote = dict(quote_row)
+                writer.writerow([
+                    quote["id"],
+                    quote["content"],
+                    quote["author"],
+                    quote["added_by"],
+                    quote["created_at"],
+                ])
 
-            # Create a Discord file from the CSV
             output.seek(0)
-            file = discord.File(
-                fp=StringIO(output.getvalue()),
-                filename=f"quotes_{ctx.guild.name}_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
-            )
+            csv_data = output.getvalue()
+            file = discord.File(fp=csv_data.encode(), filename=f"quotes_{ctx.guild.id}.csv")
+            await ctx.send("Here are all the quotes exported as CSV:", file=file)
 
-            await ctx.send("Here are all the quotes:", file=file)
-
-    @quote.command(name="import")
+    @quote.command(name="import")  # type: ignore[arg-type]
     @commands.has_permissions(administrator=True)
-    async def import_quotes(self, ctx):
-        """Import quotes from a CSV file (admin only).
+    async def import_quotes(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Import quotes from a CSV file. Admin only."""
+        if ctx.guild is None:
+            await ctx.send("This command can only be used in a server.")
+            return
 
-        The CSV should be attached to the message and have the format:
-        Quote,Author
-        """
         if not ctx.message.attachments:
             await ctx.send("Please attach a CSV file with your quotes.")
             return
 
         attachment = ctx.message.attachments[0]
-        if not attachment.filename.endswith(".csv"):
+        if not attachment.filename or not attachment.filename.endswith(".csv"):
             await ctx.send("Please attach a CSV file.")
             return
-
-        import csv
-        from io import StringIO
 
         # Download the CSV file
         content = await attachment.read()
         csv_content = content.decode("utf-8")
 
-        # Parse the CSV
-        reader = csv.reader(StringIO(csv_content))
+        # Parse CSV
+        csv_reader = csv.DictReader(StringIO(csv_content))
+        imported_count = 0
 
-        try:
-            # Skip header row
-            next(reader)
+        async with aiosqlite.connect(self.db_path) as db:
+            for row in csv_reader:
+                try:
+                    # Expecting columns: Content, Author
+                    if "Content" in row and "Author" in row:
+                        content_text = row["Content"].strip()
+                        author = row["Author"].strip()
 
-            # Process quotes
-            quotes_added = 0
-            async with aiosqlite.connect(self.db_path) as db:
-                for row in reader:
-                    if len(row) >= 2:  # Ensure we have at least quote and author
-                        quote_text = row[0].strip()
-                        author = row[1].strip()
-
-                        if quote_text and author:
+                        if content_text and author:
                             await db.execute(
                                 "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
-                                (quote_text, author, ctx.author.id, ctx.guild.id),
+                                (content_text, author, ctx.author.id, ctx.guild.id),
                             )
-                            quotes_added += 1
+                            imported_count += 1
+                except Exception as e:
+                    await ctx.send(f"Error importing row: {e}")
+                    continue
 
-                await db.commit()
+            await db.commit()
 
-            await ctx.send(f"Successfully imported {quotes_added} quotes!")
-
-        except Exception as e:
-            await ctx.send(f"Error importing quotes: {str(e)}")
-
-    def _create_quote_embed(self, quote):
-        """Create a Discord embed for a quote."""
-        # Use a warm purple color for a more elegant look
-        embed = discord.Embed(color=discord.Color.from_rgb(147, 112, 219))
-
-        # Add the quote with stylized formatting
-        embed.description = f"❝ {quote['content']} ❞"
-
-        # Add author with a decorative separator
-        embed.add_field(name="", value=f"― *{quote['author']}*", inline=False)
-
-        # Format the date in a cleaner way
-        date_added = datetime.datetime.strptime(
-            quote["date_added"], "%Y-%m-%d %H:%M:%S"
-        )
-        formatted_date = date_added.strftime("%B %d, %Y")
-
-        # Add a subtle footer with quote ID and date
-        embed.set_footer(text=f"Quote #{quote['id']} • {formatted_date}")
-
-        return embed
+        if imported_count > 0:
+            await ctx.send(f"Successfully imported {imported_count} quotes!")
+        else:
+            await ctx.send(
+                "No quotes were imported. Make sure your CSV has 'Content' and 'Author' columns."
+            )
 
     # This method can be expanded later to handle reaction-based quoting
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
+    async def on_reaction_add(
+        self, reaction: discord.Reaction, user: discord.Member
+    ) -> None:
         """Event listener for reaction adds. Can be used for reaction-based quoting."""
         # This is a placeholder for future implementation of reaction-based quoting
         # The structure would be:
-        # 1. Check if the reaction is the quote emoji
+        # 1. Check if the reaction is a specific emoji (like 💬)
         # 2. Check if the user has permission to add quotes
-        # 3. Add the quote to the database
+        # 3. Add the message content as a quote with the message author as the quote author
         pass
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
+    """Load the Quotes cog."""
     await bot.add_cog(Quotes(bot))

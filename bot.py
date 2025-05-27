@@ -1,49 +1,53 @@
 #!/usr/bin/env python3
-import os
-import logging
-import sys
 import asyncio
+import logging
+import os
+import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 import discord
 from discord.ext import commands
+from dotenv import load_dotenv
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("bot")
+logger: logging.Logger = logging.getLogger("bot")
 
 # Load environment variables
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN: str | None = os.getenv("DISCORD_TOKEN")
 
 # Create data directory if it doesn't exist
-data_dir = Path("data")
+data_dir: Path = Path("data")
 data_dir.mkdir(exist_ok=True)
 
 # Add CLI args
-cli_args = sys.argv
+cli_args: list[str] = sys.argv
 
 # Bot configuration
-intents = discord.Intents.default()
+intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-command_prefix = "?" if "--dev" in cli_args else "!"
-bot = commands.Bot(command_prefix=command_prefix, intents=intents)
+command_prefix: str = "?" if "--dev" in cli_args else "!"
+bot: commands.Bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     """Event triggered when the bot is ready."""
+    if bot.user is None:
+        logger.error("Bot user is None - this should not happen")
+        return
+
     logger.info(f"{bot.user.name} has connected to Discord!")
 
     # Load all cogs
     for cog_file in Path("cogs").glob("*.py"):
         if cog_file.name != "__init__.py":
-            cog_name = f"cogs.{cog_file.stem}"
+            cog_name: str = f"cogs.{cog_file.stem}"
             try:
                 await bot.load_extension(cog_name)
                 logger.info(f"Loaded extension {cog_name}")
@@ -52,7 +56,9 @@ async def on_ready():
 
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(
+    ctx: commands.Context[commands.Bot], error: commands.CommandError
+) -> None:
     """Global error handler for bot commands."""
     if isinstance(error, commands.CommandNotFound):
         await ctx.send("Command not found. Try `!help` to see available commands.")
@@ -65,7 +71,7 @@ async def on_command_error(ctx, error):
         await ctx.send(f"An error occurred: {error}")
 
 
-async def main():
+async def main() -> None:
     """Main entry point for the bot."""
     if not TOKEN:
         logger.error(

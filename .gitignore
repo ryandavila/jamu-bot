@@ -137,8 +137,18 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-.idea/
+# uv
+.venv/
+uv.lock
 
+# Ruff
+.ruff_cache/
+
+# IDEs
+.idea/
 .vscode/
 
-doja-leaderboard.json
+# Database files
+data/*.db
+data/*.sqlite
+data/*.sqlite3

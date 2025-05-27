@@ -15,23 +15,77 @@ A Discord bot for storing and retrieving quotes, built with Python and discord.p
 
 ## Setup
 
+### Prerequisites
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/) package manager
+
+### Installation
+
 1. Clone this repository
-2. Install dependencies:
+2. Install uv if you haven't already:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
-   pip install -r requirements.txt
+3. Install dependencies:
+   ```bash
+   uv sync
    ```
-3. Create a Discord bot on the [Discord Developer Portal](https://discord.com/developers/applications)
-4. Enable the "Message Content Intent" in the Bot section
-5. Copy your bot token
-6. Create a `.env` file in the project root with:
+4. Create a Discord bot on the [Discord Developer Portal](https://discord.com/developers/applications)
+5. Enable the "Message Content Intent" in the Bot section
+6. Copy your bot token
+7. Create a `.env` file in the project root with:
    ```
    DISCORD_TOKEN=your_discord_token_here
    ```
-7. Invite your bot to your server with the proper permissions (Send Messages, Read Message History, Add Reactions)
-8. Run the bot:
+8. Invite your bot to your server with the proper permissions (Send Messages, Read Message History, Add Reactions)
+9. Run the bot:
+   ```bash
+   uv run python bot.py
    ```
-   python bot.py
-   ```
+
+### Development
+
+For development with type checking:
+```bash
+# Install development dependencies
+uv sync --group dev
+
+# Run type checking
+uv run mypy .
+
+# Run linting
+uv run ruff check .
+```
+
+### Using the Makefile
+
+A Makefile is provided for common development tasks:
+
+```bash
+# Show all available commands
+make help
+
+# Complete development setup
+make dev-setup
+
+# Install dependencies
+make install-dev
+
+# Run code quality checks
+make check
+
+# Run the bot in development mode
+make run-dev
+
+# Run the bot in production mode
+make run
+
+# Docker commands
+make build
+make up
+make logs
+make down
+```
 
 ## Commands
 
@@ -49,10 +103,3 @@ A Discord bot for storing and retrieving quotes, built with Python and discord.p
 ## Data Storage
 
 Quotes are stored in an SQLite database (`data/quotes.db`), which is automatically created when the bot first runs.
-
-## Requirements
-
-- Python 3.7+
-- discord.py 2.0+
-- aiosqlite
-- python-dotenv
