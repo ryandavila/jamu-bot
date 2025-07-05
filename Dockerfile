@@ -5,16 +5,11 @@ WORKDIR /app
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy dependency files
+# Copy dependency files first for better caching
 COPY pyproject.toml ./
 
-# Install build dependencies for potential native extensions
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  gcc \
-  libc6-dev \
-  && rm -rf /var/lib/apt/lists/* \
-  && uv pip install --system --no-cache -e . \
-  && apt-get purge -y --auto-remove gcc libc6-dev
+# Install dependencies only
+RUN uv pip install --system --no-cache discord.py>=2.3.2 python-dotenv>=1.0.0 aiosqlite>=0.19.0
 
 # Copy application code
 COPY . .

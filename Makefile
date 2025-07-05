@@ -38,6 +38,11 @@ run-dev: ## Run the bot in development mode
 build: ## Build Docker image with compose
 	docker compose build
 
+rebuild: ## Rebuild Docker image (clean build with cleanup)
+	docker compose down -v
+	docker system prune -f
+	docker compose build --no-cache
+
 up: ## Start the bot with docker compose
 	docker compose up -d
 
