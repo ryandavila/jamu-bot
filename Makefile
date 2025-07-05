@@ -35,10 +35,10 @@ run-dev: ## Run the bot in development mode
 	uv run python bot.py --dev
 
 # Docker commands
-build: ## Build Docker image with compose
+rebuild: ## Build Docker image with compose
 	docker compose build
 
-rebuild: ## Rebuild Docker image (clean build with cleanup)
+rebuild-full: ## Rebuild Docker image (clean build with cleanup)
 	docker compose down -v
 	docker system prune -f
 	docker compose build --no-cache
