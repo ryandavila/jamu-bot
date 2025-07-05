@@ -28,10 +28,18 @@ class Quotes(commands.Cog):
                     author TEXT NOT NULL,
                     added_by INTEGER NOT NULL,
                     guild_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    original_timestamp TIMESTAMP
                 )
                 """
             )
+            # Add the new column to existing databases (ignore if already exists)
+            try:
+                await db.execute(
+                    "ALTER TABLE quotes ADD COLUMN original_timestamp TIMESTAMP"
+                )
+            except aiosqlite.OperationalError:
+                pass  # Column already exists
             await db.execute(
                 "CREATE INDEX IF NOT EXISTS idx_quotes_guild_id ON quotes(guild_id)"
             )
@@ -39,10 +47,12 @@ class Quotes(commands.Cog):
 
     def _create_quote_embed(self, quote: dict[str, Any]) -> discord.Embed:
         """Create a Discord embed for a quote."""
+        # Use original timestamp if available, otherwise use created_at
+        timestamp = quote.get("original_timestamp") or quote["created_at"]
         embed = discord.Embed(
             description=f'"{quote["content"]}"',
             color=discord.Color.blue(),
-            timestamp=datetime.datetime.fromisoformat(quote["created_at"]),
+            timestamp=datetime.datetime.fromisoformat(timestamp),
         )
         embed.set_author(name=quote["author"])
         embed.set_footer(text=f"Quote #{quote['id']}")
@@ -101,7 +111,7 @@ class Quotes(commands.Cog):
                         )
                         return
 
-                    await self._add_quote_to_db(ctx, quote_text, author)
+                    await self._add_quote_to_db(ctx, quote_text, author, referenced_message.created_at)
                     return
                 except discord.NotFound:
                     await ctx.send("Could not find the referenced message.")
@@ -136,7 +146,7 @@ class Quotes(commands.Cog):
         await self._add_quote_to_db(ctx, quote_text, author)
 
     async def _add_quote_to_db(
-        self, ctx: commands.Context[commands.Bot], quote_text: str, author: str
+        self, ctx: commands.Context[commands.Bot], quote_text: str, author: str, created_at: datetime.datetime | None = None
     ) -> None:
         """Helper method to add a quote to the database."""
         if ctx.guild is None:
@@ -144,10 +154,16 @@ class Quotes(commands.Cog):
             return
 
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
-                (quote_text, author, ctx.author.id, ctx.guild.id),
-            )
+            if created_at:
+                await db.execute(
+                    "INSERT INTO quotes (content, author, added_by, guild_id, original_timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (quote_text, author, ctx.author.id, ctx.guild.id, created_at.isoformat()),
+                )
+            else:
+                await db.execute(
+                    "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
+                    (quote_text, author, ctx.author.id, ctx.guild.id),
+                )
             await db.commit()
 
         # Reply in thread if possible, otherwise regular reply
