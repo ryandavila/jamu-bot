@@ -32,6 +32,9 @@ class Quotes(commands.Cog):
                 )
                 """
             )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_quotes_guild_id ON quotes(guild_id)"
+            )
             await db.commit()
 
     def _create_quote_embed(self, quote: dict[str, Any]) -> discord.Embed:
@@ -493,6 +496,7 @@ class Quotes(commands.Cog):
         imported_count = 0
 
         async with aiosqlite.connect(self.db_path) as db:
+            quotes_to_insert = []
             for row in csv_reader:
                 try:
                     # Expecting columns: Content, Author
@@ -501,16 +505,18 @@ class Quotes(commands.Cog):
                         author = row["Author"].strip()
 
                         if content_text and author:
-                            await db.execute(
-                                "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
-                                (content_text, author, ctx.author.id, ctx.guild.id),
-                            )
+                            quotes_to_insert.append((content_text, author, ctx.author.id, ctx.guild.id))
                             imported_count += 1
                 except Exception as e:
                     await ctx.send(f"Error importing row: {e}")
                     continue
 
-            await db.commit()
+            if quotes_to_insert:
+                await db.executemany(
+                    "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
+                    quotes_to_insert
+                )
+                await db.commit()
 
         if imported_count > 0:
             await ctx.send(f"Successfully imported {imported_count} quotes!")
