@@ -150,7 +150,14 @@ class Quotes(commands.Cog):
             )
             await db.commit()
 
-        await ctx.send(f"Quote by {author} has been added!")
+        # Add reaction to the original message
+        try:
+            await ctx.message.add_reaction("💬")
+        except discord.HTTPException:
+            pass  # Ignore if we can't add reaction
+        
+        # Reply in thread if possible, otherwise regular reply
+        await ctx.reply(f"Quote by {author} has been added!", mention_author=False)
 
     @quote.command(name="list")  # type: ignore[arg-type]
     async def list_quotes(
