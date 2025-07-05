@@ -96,7 +96,9 @@ class Quotes(commands.Cog):
                     author = referenced_message.author.display_name
 
                     if not quote_text:
-                        await ctx.send("The referenced message has no content to quote.")
+                        await ctx.send(
+                            "The referenced message has no content to quote."
+                        )
                         return
 
                     await self._add_quote_to_db(ctx, quote_text, author)
@@ -118,9 +120,7 @@ class Quotes(commands.Cog):
 
         # Parse the quote and author
         if " - " not in content:
-            await ctx.send(
-                "Please use the format: `!quote add <quote> - <author>`"
-            )
+            await ctx.send("Please use the format: `!quote add <quote> - <author>`")
             return
 
         quote_text, author = content.rsplit(" - ", 1)
@@ -150,12 +150,6 @@ class Quotes(commands.Cog):
             )
             await db.commit()
 
-        # Add reaction to the original message
-        try:
-            await ctx.message.add_reaction("💬")
-        except discord.HTTPException:
-            pass  # Ignore if we can't add reaction
-        
         # Reply in thread if possible, otherwise regular reply
         await ctx.reply(f"Quote by {author} has been added!", mention_author=False)
 
@@ -245,7 +239,10 @@ class Quotes(commands.Cog):
                             "reaction_add", timeout=60.0, check=check
                         )
 
-                        if str(reaction.emoji) == "➡️" and current_page < total_pages - 1:
+                        if (
+                            str(reaction.emoji) == "➡️"
+                            and current_page < total_pages - 1
+                        ):
                             current_page += 1
                             await message.edit(embed=create_page_embed(current_page))
                         elif str(reaction.emoji) == "⬅️" and current_page > 0:
@@ -315,7 +312,9 @@ class Quotes(commands.Cog):
             is_quote_adder = quote_dict["added_by"] == ctx.author.id
 
             if not (is_admin or is_quote_adder):
-                await ctx.send("You can only delete quotes you added or you must be an admin.")
+                await ctx.send(
+                    "You can only delete quotes you added or you must be an admin."
+                )
                 return
 
             await db.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
@@ -389,7 +388,10 @@ class Quotes(commands.Cog):
                             "reaction_add", timeout=60.0, check=check
                         )
 
-                        if str(reaction.emoji) == "➡️" and current_page < total_pages - 1:
+                        if (
+                            str(reaction.emoji) == "➡️"
+                            and current_page < total_pages - 1
+                        ):
                             current_page += 1
                             await message.edit(embed=create_page_embed(current_page))
                         elif str(reaction.emoji) == "⬅️" and current_page > 0:
@@ -464,17 +466,21 @@ class Quotes(commands.Cog):
 
             for quote_row in quotes_rows:
                 quote = dict(quote_row)
-                writer.writerow([
-                    quote["id"],
-                    quote["content"],
-                    quote["author"],
-                    quote["added_by"],
-                    quote["created_at"],
-                ])
+                writer.writerow(
+                    [
+                        quote["id"],
+                        quote["content"],
+                        quote["author"],
+                        quote["added_by"],
+                        quote["created_at"],
+                    ]
+                )
 
             output.seek(0)
             csv_data = output.getvalue()
-            file = discord.File(fp=csv_data.encode(), filename=f"quotes_{ctx.guild.id}.csv")
+            file = discord.File(
+                fp=csv_data.encode(), filename=f"quotes_{ctx.guild.id}.csv"
+            )
             await ctx.send("Here are all the quotes exported as CSV:", file=file)
 
     @quote.command(name="import")  # type: ignore[arg-type]
@@ -512,7 +518,9 @@ class Quotes(commands.Cog):
                         author = row["Author"].strip()
 
                         if content_text and author:
-                            quotes_to_insert.append((content_text, author, ctx.author.id, ctx.guild.id))
+                            quotes_to_insert.append(
+                                (content_text, author, ctx.author.id, ctx.guild.id)
+                            )
                             imported_count += 1
                 except Exception as e:
                     await ctx.send(f"Error importing row: {e}")
@@ -521,7 +529,7 @@ class Quotes(commands.Cog):
             if quotes_to_insert:
                 await db.executemany(
                     "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
-                    quotes_to_insert
+                    quotes_to_insert,
                 )
                 await db.commit()
 
