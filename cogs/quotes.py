@@ -14,7 +14,11 @@ class Quotes(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.db_path = Path("data/quotes.db")
+        # Use separate database for dev mode
+        import sys
+        dev_mode = "--dev" in sys.argv
+        db_name = "quotes_dev.db" if dev_mode else "quotes.db"
+        self.db_path = Path(f"data/{db_name}")
         self.db_path.parent.mkdir(exist_ok=True)
 
     async def cog_load(self) -> None:

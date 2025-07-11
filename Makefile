@@ -35,27 +35,28 @@ run-dev: ## Run the bot in development mode
 	uv run python bot.py --dev
 
 # Docker commands
-rebuild: ## Rebuild and start Docker container
+rebuild: ## Rebuild and start Docker container (use 'make rebuild SERVICE=jamu-bot-dev' for dev mode)
 	docker compose build
-	docker compose up -d
+	docker compose up $(or $(SERVICE),jamu-bot) -d
 
-rebuild-full: ## Rebuild Docker image (clean build with cleanup) and start
+rebuild-full: ## Rebuild Docker image (clean build with cleanup) and start (use 'make rebuild-full SERVICE=jamu-bot-dev' for dev mode)
 	docker compose down -v
 	docker system prune -f
 	docker compose build --no-cache
-	docker compose up -d
+	docker compose up $(or $(SERVICE),jamu-bot) -d
 
-up: ## Start the bot with docker compose
-	docker compose up -d
+up: ## Start the bot with docker compose (use 'make up SERVICE=jamu-bot-dev' for dev mode)
+	docker compose up $(or $(SERVICE),jamu-bot) -d
 
-down: ## Stop and remove containers
-	docker compose down
+down: ## Stop and remove containers (use 'make down SERVICE=jamu-bot-dev' for dev only)
+	docker compose stop $(or $(SERVICE),jamu-bot)
+	docker compose rm -f $(or $(SERVICE),jamu-bot)
 
-restart: ## Restart the bot
-	docker compose restart
+restart: ## Restart the bot (use 'make restart SERVICE=jamu-bot-dev' for dev mode)
+	docker compose restart $(or $(SERVICE),jamu-bot)
 
-logs: ## Show Docker container logs
-	docker compose logs -f jamu-bot
+logs: ## Show Docker container logs (use 'make logs SERVICE=jamu-bot-dev' for dev mode)
+	docker compose logs -f $(or $(SERVICE),jamu-bot)
 
 status: ## Show container status
 	docker compose ps

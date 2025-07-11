@@ -25,13 +25,14 @@ data_dir.mkdir(exist_ok=True)
 
 # Add CLI args
 cli_args: list[str] = sys.argv
+DEV_MODE: bool = "--dev" in cli_args
 
 # Bot configuration
 intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-command_prefix: str = "?" if "--dev" in cli_args else "!"
+command_prefix: str = "?" if DEV_MODE else "!"
 bot: commands.Bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 
 
@@ -42,7 +43,8 @@ async def on_ready() -> None:
         logger.error("Bot user is None - this should not happen")
         return
 
-    logger.info(f"{bot.user.name} has connected to Discord!")
+    mode = "DEVELOPMENT" if DEV_MODE else "PRODUCTION"
+    logger.info(f"{bot.user.name} has connected to Discord! (Mode: {mode}, Prefix: {command_prefix})")
 
     # Load all cogs
     for cog_file in Path("cogs").glob("*.py"):
