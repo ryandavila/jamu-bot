@@ -80,3 +80,22 @@ dev-setup: install-dev env-example ## Complete development setup
 
 pre-commit: check ## Run pre-commit checks (lint + type-check)
 	@echo "All checks passed! ✅"
+
+# Database migration targets
+migrate: ## Run Alembic database migrations
+	uv run alembic upgrade head
+
+migrate-dev: ## Run Alembic database migrations for dev environment
+	uv run alembic --dev upgrade head
+
+migration: ## Create a new migration (usage: make migration MESSAGE="description")
+	uv run alembic revision --autogenerate -m "$(MESSAGE)"
+
+migration-dev: ## Create a new migration in dev mode
+	uv run alembic --dev revision --autogenerate -m "$(MESSAGE)"
+
+migration-history: ## Show migration history
+	uv run alembic history
+
+migration-current: ## Show current migration
+	uv run alembic current

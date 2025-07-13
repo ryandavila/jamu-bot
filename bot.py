@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import asyncio
 import logging
 import os
@@ -9,13 +8,11 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-# Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger: logging.Logger = logging.getLogger("bot")
 
-# Load environment variables
 load_dotenv()
 TOKEN: str | None = os.getenv("DISCORD_TOKEN")
 
@@ -44,7 +41,9 @@ async def on_ready() -> None:
         return
 
     mode = "DEVELOPMENT" if DEV_MODE else "PRODUCTION"
-    logger.info(f"{bot.user.name} has connected to Discord! (Mode: {mode}, Prefix: {command_prefix})")
+    logger.info(
+        f"{bot.user.name} has connected to Discord! (Mode: {mode}, Prefix: {command_prefix})"
+    )
 
     # Load all cogs
     for cog_file in Path("cogs").glob("*.py"):
@@ -79,6 +78,29 @@ async def main() -> None:
         logger.error(
             "No Discord token found. Please set the DISCORD_TOKEN environment variable."
         )
+        return
+
+    # Run database migrations before starting the bot
+    try:
+        import subprocess
+
+        # Run Alembic migrations
+        # Pass dev mode flag so migrations/env.py can detect it
+        cmd = ["uv", "run", "alembic", "upgrade", "head"]
+
+        # Set environment to pass dev mode flag
+        env = os.environ.copy()
+        if DEV_MODE:
+            env["JAMU_DEV_MODE"] = "1"
+
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        if result.returncode != 0:
+            logger.error(f"Alembic migration failed: {result.stderr}")
+            return
+        else:
+            logger.info("Database migrations completed successfully")
+    except Exception as e:
+        logger.error(f"Database migration failed: {e}")
         return
 
     try:

@@ -16,38 +16,16 @@ class Quotes(commands.Cog):
         self.bot = bot
         # Use separate database for dev mode
         import sys
+
         dev_mode = "--dev" in sys.argv
         db_name = "quotes_dev.db" if dev_mode else "quotes.db"
         self.db_path = Path(f"data/{db_name}")
         self.db_path.parent.mkdir(exist_ok=True)
 
     async def cog_load(self) -> None:
-        """Initialize the database when the cog is loaded."""
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS quotes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    content TEXT NOT NULL,
-                    author TEXT NOT NULL,
-                    added_by INTEGER NOT NULL,
-                    guild_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    original_timestamp TIMESTAMP
-                )
-                """
-            )
-            # Add the new column to existing databases (ignore if already exists)
-            try:
-                await db.execute(
-                    "ALTER TABLE quotes ADD COLUMN original_timestamp TIMESTAMP"
-                )
-            except aiosqlite.OperationalError:
-                pass  # Column already exists
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_quotes_guild_id ON quotes(guild_id)"
-            )
-            await db.commit()
+        """Initialize the cog when loaded."""
+        # Database should already be migrated at app startup
+        pass
 
     def _create_quote_embed(self, quote: dict[str, Any]) -> discord.Embed:
         """Create a Discord embed for a quote."""
@@ -62,6 +40,64 @@ class Quotes(commands.Cog):
         embed.set_footer(text=f"Quote #{quote['id']}")
         return embed
 
+    def _can_user_access_channel(self, user: discord.Member, channel_id: int) -> bool:
+        """Check if a user can access a specific channel."""
+        if channel_id == 0:  # Unknown/legacy channel, allow access
+            return True
+
+        channel = user.guild.get_channel(channel_id)
+        if channel is None:
+            # Channel doesn't exist anymore, don't show the quote
+            return False
+
+        # Check if user can view the channel
+        if isinstance(
+            channel,
+            discord.TextChannel
+            | discord.VoiceChannel
+            | discord.StageChannel
+            | discord.ForumChannel,
+        ):
+            return channel.permissions_for(user).view_channel
+
+        # For other channel types, default to allowing access
+        return True
+
+    async def _get_accessible_quotes_query(
+        self, user: discord.Member, base_query: str, params: tuple[Any, ...]
+    ) -> tuple[str, tuple[Any, ...]]:
+        """Modify a query to only return quotes from channels the user can access."""
+        # Get all channels the user can access
+        accessible_channel_ids = [0]  # Always include legacy quotes
+
+        for channel in user.guild.channels:
+            if isinstance(
+                channel,
+                discord.TextChannel
+                | discord.VoiceChannel
+                | discord.StageChannel
+                | discord.ForumChannel,
+            ):
+                if channel.permissions_for(user).view_channel:
+                    accessible_channel_ids.append(channel.id)
+
+        # Modify the query to include channel restriction
+        if "WHERE" in base_query:
+            modified_query = base_query.replace(
+                "WHERE",
+                f"WHERE channel_id IN ({','.join(['?'] * len(accessible_channel_ids))}) AND",
+            )
+        else:
+            modified_query = (
+                base_query
+                + f" WHERE channel_id IN ({','.join(['?'] * len(accessible_channel_ids))})"
+            )
+
+        # Add accessible channel IDs to the beginning of params
+        modified_params = tuple(accessible_channel_ids) + params
+
+        return modified_query, modified_params
+
     @commands.hybrid_group(name="quote", invoke_without_command=True)  # type: ignore[arg-type]
     async def quote(self, ctx: commands.Context[commands.Bot]) -> None:
         """Get a random quote."""
@@ -69,12 +105,22 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used in a server.")
             return
 
+        if not isinstance(ctx.author, discord.Member):
+            await ctx.send("This command can only be used by server members.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT * FROM quotes WHERE guild_id = ? ORDER BY RANDOM() LIMIT 1",
-                (ctx.guild.id,),
+
+            # Get channel-aware query
+            base_query = (
+                "SELECT * FROM quotes WHERE guild_id = ? ORDER BY RANDOM() LIMIT 1"
             )
+            query, params = await self._get_accessible_quotes_query(
+                ctx.author, base_query, (ctx.guild.id,)
+            )
+
+            cursor = await db.execute(query, params)
             quote_row = await cursor.fetchone()
             if quote_row:
                 quote_dict = dict(quote_row)
@@ -115,7 +161,13 @@ class Quotes(commands.Cog):
                         )
                         return
 
-                    await self._add_quote_to_db(ctx, quote_text, author, referenced_message.created_at)
+                    await self._add_quote_to_db(
+                        ctx,
+                        quote_text,
+                        author,
+                        referenced_message.created_at,
+                        referenced_message.channel.id,
+                    )
                     return
                 except discord.NotFound:
                     await ctx.send("Could not find the referenced message.")
@@ -150,23 +202,38 @@ class Quotes(commands.Cog):
         await self._add_quote_to_db(ctx, quote_text, author)
 
     async def _add_quote_to_db(
-        self, ctx: commands.Context[commands.Bot], quote_text: str, author: str, created_at: datetime.datetime | None = None
+        self,
+        ctx: commands.Context[commands.Bot],
+        quote_text: str,
+        author: str,
+        created_at: datetime.datetime | None = None,
+        channel_id: int | None = None,
     ) -> None:
         """Helper method to add a quote to the database."""
         if ctx.guild is None:
             await ctx.send("This command can only be used in a server.")
             return
 
+        # Use the provided channel_id or default to the current channel
+        quote_channel_id = channel_id if channel_id is not None else ctx.channel.id
+
         async with aiosqlite.connect(self.db_path) as db:
             if created_at:
                 await db.execute(
-                    "INSERT INTO quotes (content, author, added_by, guild_id, original_timestamp) VALUES (?, ?, ?, ?, ?)",
-                    (quote_text, author, ctx.author.id, ctx.guild.id, created_at.isoformat()),
+                    "INSERT INTO quotes (content, author, added_by, guild_id, channel_id, original_timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        quote_text,
+                        author,
+                        ctx.author.id,
+                        ctx.guild.id,
+                        quote_channel_id,
+                        created_at.isoformat(),
+                    ),
                 )
             else:
                 await db.execute(
-                    "INSERT INTO quotes (content, author, added_by, guild_id) VALUES (?, ?, ?, ?)",
-                    (quote_text, author, ctx.author.id, ctx.guild.id),
+                    "INSERT INTO quotes (content, author, added_by, guild_id, channel_id) VALUES (?, ?, ?, ?, ?)",
+                    (quote_text, author, ctx.author.id, ctx.guild.id, quote_channel_id),
                 )
             await db.commit()
 
@@ -187,20 +254,27 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used in a server.")
             return
 
+        if not isinstance(ctx.author, discord.Member):
+            await ctx.send("This command can only be used by server members.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
 
             if author:
-                cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? AND author LIKE ? ORDER BY created_at DESC",
-                    (ctx.guild.id, f"%{author}%"),
+                base_query = "SELECT * FROM quotes WHERE guild_id = ? AND author LIKE ? ORDER BY created_at DESC"
+                query, params = await self._get_accessible_quotes_query(
+                    ctx.author, base_query, (ctx.guild.id, f"%{author}%")
                 )
             else:
-                cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? ORDER BY created_at DESC",
-                    (ctx.guild.id,),
+                base_query = (
+                    "SELECT * FROM quotes WHERE guild_id = ? ORDER BY created_at DESC"
+                )
+                query, params = await self._get_accessible_quotes_query(
+                    ctx.author, base_query, (ctx.guild.id,)
                 )
 
+            cursor = await db.execute(query, params)
             quotes_rows = await cursor.fetchall()
             quotes = [dict(row) for row in quotes_rows]
 
@@ -285,6 +359,10 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used in a server.")
             return
 
+        if not isinstance(ctx.author, discord.Member):
+            await ctx.send("This command can only be used by server members.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
@@ -295,8 +373,14 @@ class Quotes(commands.Cog):
 
             if quote_row:
                 quote_dict = dict(quote_row)
-                embed = self._create_quote_embed(quote_dict)
-                await ctx.send(embed=embed)
+                # Check if user can access the channel where this quote originated
+                if self._can_user_access_channel(
+                    ctx.author, quote_dict.get("channel_id", 0)
+                ):
+                    embed = self._create_quote_embed(quote_dict)
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send(f"Quote with ID {quote_id} not found.")
             else:
                 await ctx.send(f"Quote with ID {quote_id} not found.")
 
@@ -323,8 +407,14 @@ class Quotes(commands.Cog):
 
             quote_dict = dict(quote_row)
 
-            # Check permissions
+            # Check if user can access the channel where this quote originated
             if isinstance(ctx.author, discord.Member):
+                if not self._can_user_access_channel(
+                    ctx.author, quote_dict.get("channel_id", 0)
+                ):
+                    await ctx.send(f"Quote with ID {quote_id} not found.")
+                    return
+
                 is_admin = ctx.author.guild_permissions.administrator
             else:
                 is_admin = False
@@ -351,12 +441,21 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used in a server.")
             return
 
+        if not isinstance(ctx.author, discord.Member):
+            await ctx.send("This command can only be used by server members.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute(
-                "SELECT * FROM quotes WHERE guild_id = ? AND (content LIKE ? OR author LIKE ?) ORDER BY created_at DESC",
+
+            base_query = "SELECT * FROM quotes WHERE guild_id = ? AND (content LIKE ? OR author LIKE ?) ORDER BY created_at DESC"
+            query, params = await self._get_accessible_quotes_query(
+                ctx.author,
+                base_query,
                 (ctx.guild.id, f"%{search_term}%", f"%{search_term}%"),
             )
+
+            cursor = await db.execute(query, params)
             quotes_rows = await cursor.fetchall()
             quotes = [dict(row) for row in quotes_rows]
 
@@ -434,20 +533,27 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used in a server.")
             return
 
+        if not isinstance(ctx.author, discord.Member):
+            await ctx.send("This command can only be used by server members.")
+            return
+
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
 
             if author:
-                cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? AND author LIKE ? ORDER BY RANDOM() LIMIT 1",
-                    (ctx.guild.id, f"%{author}%"),
+                base_query = "SELECT * FROM quotes WHERE guild_id = ? AND author LIKE ? ORDER BY RANDOM() LIMIT 1"
+                query, params = await self._get_accessible_quotes_query(
+                    ctx.author, base_query, (ctx.guild.id, f"%{author}%")
                 )
             else:
-                cursor = await db.execute(
-                    "SELECT * FROM quotes WHERE guild_id = ? ORDER BY RANDOM() LIMIT 1",
-                    (ctx.guild.id,),
+                base_query = (
+                    "SELECT * FROM quotes WHERE guild_id = ? ORDER BY RANDOM() LIMIT 1"
+                )
+                query, params = await self._get_accessible_quotes_query(
+                    ctx.author, base_query, (ctx.guild.id,)
                 )
 
+            cursor = await db.execute(query, params)
             quote_row = await cursor.fetchone()
             if quote_row:
                 quote_dict = dict(quote_row)
@@ -470,7 +576,7 @@ class Quotes(commands.Cog):
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
-                "SELECT id, content, author, added_by, created_at FROM quotes WHERE guild_id = ? ORDER BY id",
+                "SELECT id, content, author, added_by, created_at, channel_id FROM quotes WHERE guild_id = ? ORDER BY id",
                 (ctx.guild.id,),
             )
             quotes_rows = await cursor.fetchall()
@@ -482,7 +588,9 @@ class Quotes(commands.Cog):
             # Create CSV content
             output = StringIO()
             writer = csv.writer(output)
-            writer.writerow(["ID", "Content", "Author", "Added By", "Created At"])
+            writer.writerow(
+                ["ID", "Content", "Author", "Added By", "Created At", "Channel ID"]
+            )
 
             for quote_row in quotes_rows:
                 quote = dict(quote_row)
@@ -493,6 +601,7 @@ class Quotes(commands.Cog):
                         quote["author"],
                         quote["added_by"],
                         quote["created_at"],
+                        quote.get("channel_id", 0),
                     ]
                 )
 
