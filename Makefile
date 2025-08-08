@@ -15,10 +15,7 @@ sync: ## Sync dependencies (alias for install-dev)
 # Code quality and checking
 check: lint type-check ## Run all code quality checks
 
-lint: ## Run ruff linter
-	uv run ruff check .
-
-lint-fix: ## Run ruff linter with auto-fix
+lint: ## Run ruff linter with auto-fix
 	uv run ruff check --fix .
 
 type-check: ## Run mypy type checking
