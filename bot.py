@@ -1,36 +1,23 @@
 import asyncio
 import logging
-import os
-import sys
 from pathlib import Path
 
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+
+from config import config
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger: logging.Logger = logging.getLogger("bot")
 
-load_dotenv()
-TOKEN: str | None = os.getenv("DISCORD_TOKEN")
-
-# Create data directory if it doesn't exist
-data_dir: Path = Path("data")
-data_dir.mkdir(exist_ok=True)
-
-# Add CLI args
-cli_args: list[str] = sys.argv
-DEV_MODE: bool = "--dev" in cli_args
-
 # Bot configuration
 intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-command_prefix: str = "?" if DEV_MODE else "!"
-bot: commands.Bot = commands.Bot(command_prefix=command_prefix, intents=intents)
+bot: commands.Bot = commands.Bot(command_prefix=config.command_prefix, intents=intents)
 
 
 @bot.event
@@ -40,9 +27,8 @@ async def on_ready() -> None:
         logger.error("Bot user is None - this should not happen")
         return
 
-    mode = "DEVELOPMENT" if DEV_MODE else "PRODUCTION"
     logger.info(
-        f"{bot.user.name} has connected to Discord! (Mode: {mode}, Prefix: {command_prefix})"
+        f"{bot.user.name} has connected to Discord! (Mode: {config.mode_display}, Prefix: {config.command_prefix})"
     )
 
     # Load all cogs
@@ -74,7 +60,7 @@ async def on_command_error(
 
 async def main() -> None:
     """Main entry point for the bot."""
-    if not TOKEN:
+    if not config.discord_token:
         logger.error(
             "No Discord token found. Please set the DISCORD_TOKEN environment variable."
         )
@@ -85,15 +71,8 @@ async def main() -> None:
         import subprocess
 
         # Run Alembic migrations
-        # Pass dev mode flag so migrations/env.py can detect it
         cmd = ["uv", "run", "alembic", "upgrade", "head"]
-
-        # Set environment to pass dev mode flag
-        env = os.environ.copy()
-        if DEV_MODE:
-            env["JAMU_DEV_MODE"] = "1"
-
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error(f"Alembic migration failed: {result.stderr}")
             return
@@ -104,7 +83,7 @@ async def main() -> None:
         return
 
     try:
-        await bot.start(TOKEN)
+        await bot.start(config.discord_token)
     except discord.errors.LoginFailure:
         logger.error(
             "Invalid Discord token. Please check your DISCORD_TOKEN environment variable."

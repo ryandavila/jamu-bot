@@ -32,17 +32,9 @@ target_metadata = Base.metadata
 
 
 def get_database_url() -> str:
-    """Get database URL, handling dev mode."""
-    import os
-    import sys
-
-    # Check for dev mode from environment variable or command line
-    dev_mode = os.getenv("JAMU_DEV_MODE") == "1" or "--dev" in sys.argv
-    db_name = "quotes_dev.db" if dev_mode else "quotes.db"
-    db_path = Path(f"data/{db_name}")
-    db_path.parent.mkdir(exist_ok=True)
-
-    return f"sqlite+aiosqlite:///{db_path}"
+    """Get database URL using centralized configuration."""
+    from config import config
+    return config.database_url
 
 
 def run_migrations_offline() -> None:

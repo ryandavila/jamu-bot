@@ -6,17 +6,7 @@ services:
       - .:/app
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - JAMU_ENV=${JAMU_ENV:-prod}
     command: python bot.py
     network_mode: host
     restart: unless-stopped
-
-  jamu-bot-dev:
-    build: .
-    container_name: jamu-bot-dev
-    volumes:
-      - .:/app
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN_DEV:-${DISCORD_TOKEN}}
-    command: python bot.py --dev
-    network_mode: host
-    restart: "no"
