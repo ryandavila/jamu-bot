@@ -32,7 +32,7 @@ class Config:
         """Get the database path based on environment."""
         data_dir = Path("data")
         data_dir.mkdir(exist_ok=True)
-        
+
         db_name = "quotes_dev.db" if self.is_dev else "quotes.db"
         return data_dir / db_name
 

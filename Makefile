@@ -13,7 +13,23 @@ sync: ## Sync dependencies (alias for install-dev)
 	uv sync --extra dev
 
 # Code quality and checking
-check: lint type-check ## Run all code quality checks
+check: lint type-check test ## Run all code quality checks including tests
+
+test: ## Run tests with pytest
+	uv run pytest tests/ -v
+
+test-cov: ## Run tests with coverage report
+	uv run pytest tests/ --cov=. --cov-report=term-missing
+
+test-cov-html: ## Run tests with HTML coverage report
+	uv run pytest tests/ --cov=. --cov-report=html --cov-report=term-missing
+	@echo "Coverage report generated in htmlcov/index.html"
+
+test-fast: ## Run tests without verbose output
+	uv run pytest tests/
+
+test-watch: ## Run tests in watch mode (re-run on file changes)
+	uv run pytest-watch tests/
 
 lint: ## Run ruff linter with auto-fix
 	uv run ruff check --fix .

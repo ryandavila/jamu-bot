@@ -1,7 +1,6 @@
 import csv
 import datetime
 from io import StringIO
-from typing import Any
 
 import discord
 from discord.ext import commands
@@ -96,16 +95,21 @@ class Quotes(commands.Cog):
         async with self.async_session() as session:
             # Get accessible channel IDs
             accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
-            
+
             # Query for random quote from accessible channels
-            query = select(Quote).where(
-                Quote.guild_id == ctx.guild.id,
-                Quote.channel_id.in_(accessible_channel_ids)
-            ).order_by(func.random()).limit(1)
-            
+            query = (
+                select(Quote)
+                .where(
+                    Quote.guild_id == ctx.guild.id,
+                    Quote.channel_id.in_(accessible_channel_ids),
+                )
+                .order_by(func.random())
+                .limit(1)
+            )
+
             result = await session.execute(query)
             quote = result.scalar_one_or_none()
-            
+
             if quote:
                 embed = self._create_quote_embed(quote)
                 await ctx.send(embed=embed)
@@ -236,16 +240,20 @@ class Quotes(commands.Cog):
         async with self.async_session() as session:
             # Get accessible channel IDs
             accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
-            
+
             # Build query based on author filter
-            query = select(Quote).where(
-                Quote.guild_id == ctx.guild.id,
-                Quote.channel_id.in_(accessible_channel_ids)
-            ).order_by(Quote.created_at.desc())
-            
+            query = (
+                select(Quote)
+                .where(
+                    Quote.guild_id == ctx.guild.id,
+                    Quote.channel_id.in_(accessible_channel_ids),
+                )
+                .order_by(Quote.created_at.desc())
+            )
+
             if author:
                 query = query.where(Quote.author.like(f"%{author}%"))
-            
+
             result = await session.execute(query)
             quotes = result.scalars().all()
 
@@ -336,8 +344,7 @@ class Quotes(commands.Cog):
 
         async with self.async_session() as session:
             query = select(Quote).where(
-                Quote.id == quote_id,
-                Quote.guild_id == ctx.guild.id
+                Quote.id == quote_id, Quote.guild_id == ctx.guild.id
             )
             result = await session.execute(query)
             quote = result.scalar_one_or_none()
@@ -363,8 +370,7 @@ class Quotes(commands.Cog):
 
         async with self.async_session() as session:
             query = select(Quote).where(
-                Quote.id == quote_id,
-                Quote.guild_id == ctx.guild.id
+                Quote.id == quote_id, Quote.guild_id == ctx.guild.id
             )
             result = await session.execute(query)
             quote = result.scalar_one_or_none()
@@ -412,14 +418,21 @@ class Quotes(commands.Cog):
         async with self.async_session() as session:
             # Get accessible channel IDs
             accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
-            
+
             # Build search query
-            query = select(Quote).where(
-                Quote.guild_id == ctx.guild.id,
-                Quote.channel_id.in_(accessible_channel_ids),
-                (Quote.content.like(f"%{search_term}%") | Quote.author.like(f"%{search_term}%"))
-            ).order_by(Quote.created_at.desc())
-            
+            query = (
+                select(Quote)
+                .where(
+                    Quote.guild_id == ctx.guild.id,
+                    Quote.channel_id.in_(accessible_channel_ids),
+                    (
+                        Quote.content.like(f"%{search_term}%")
+                        | Quote.author.like(f"%{search_term}%")
+                    ),
+                )
+                .order_by(Quote.created_at.desc())
+            )
+
             result = await session.execute(query)
             quotes = result.scalars().all()
 
@@ -504,19 +517,24 @@ class Quotes(commands.Cog):
         async with self.async_session() as session:
             # Get accessible channel IDs
             accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
-            
+
             # Build query based on author filter
-            query = select(Quote).where(
-                Quote.guild_id == ctx.guild.id,
-                Quote.channel_id.in_(accessible_channel_ids)
-            ).order_by(func.random()).limit(1)
-            
+            query = (
+                select(Quote)
+                .where(
+                    Quote.guild_id == ctx.guild.id,
+                    Quote.channel_id.in_(accessible_channel_ids),
+                )
+                .order_by(func.random())
+                .limit(1)
+            )
+
             if author:
                 query = query.where(Quote.author.like(f"%{author}%"))
-            
+
             result = await session.execute(query)
             quote = result.scalar_one_or_none()
-            
+
             if quote:
                 embed = self._create_quote_embed(quote)
                 await ctx.send(embed=embed)
@@ -535,7 +553,9 @@ class Quotes(commands.Cog):
             return
 
         async with self.async_session() as session:
-            query = select(Quote).where(Quote.guild_id == ctx.guild.id).order_by(Quote.id)
+            query = (
+                select(Quote).where(Quote.guild_id == ctx.guild.id).order_by(Quote.id)
+            )
             result = await session.execute(query)
             quotes = result.scalars().all()
 

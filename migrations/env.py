@@ -2,7 +2,6 @@
 
 import asyncio
 from logging.config import fileConfig
-from pathlib import Path
 
 from alembic import context
 from sqlalchemy import pool
@@ -34,6 +33,7 @@ target_metadata = Base.metadata
 def get_database_url() -> str:
     """Get database URL using centralized configuration."""
     from config import config
+
     return config.database_url
 
 

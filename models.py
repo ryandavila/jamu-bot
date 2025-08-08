@@ -1,6 +1,6 @@
 """SQLAlchemy models for the Jamu bot database."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.ext.asyncio import AsyncAttrs
@@ -27,7 +27,7 @@ class Quote(Base):
         Integer, nullable=False, default=0, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
     )
     original_timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
