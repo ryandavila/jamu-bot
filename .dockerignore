@@ -34,9 +34,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# uv
-uv.lock
-
 # Testing
 .tox/
 .nox/

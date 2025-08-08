@@ -5,6 +5,5 @@ services:
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - JAMU_ENV=${JAMU_ENV:-prod}
-    command: python bot.py
     network_mode: host
     restart: unless-stopped

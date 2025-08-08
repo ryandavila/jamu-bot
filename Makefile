@@ -36,10 +36,15 @@ run-dev: ## Run the bot in development mode
 
 # Docker commands
 rebuild: ## Rebuild and start Docker container (use 'make rebuild SERVICE=jamu-bot-dev' for dev mode)
+	@echo "This will rebuild the Docker container for $(or $(SERVICE),jamu-bot)"
+	@read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || exit 1
 	docker compose build
 	docker compose up $(or $(SERVICE),jamu-bot) -d
 
 rebuild-full: ## Rebuild Docker image (clean build with cleanup) and start (use 'make rebuild-full SERVICE=jamu-bot-dev' for dev mode)
+	@echo "WARNING: This will do a FULL rebuild with cleanup for $(or $(SERVICE),jamu-bot)"
+	@echo "This includes: stopping containers, removing volumes, pruning system, and rebuilding from scratch"
+	@read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || exit 1
 	docker compose down -v
 	docker system prune -f
 	docker compose build --no-cache
