@@ -2,8 +2,6 @@ services:
   jamu-bot:
     build: .
     container_name: jamu-bot
-    volumes:
-      - .:/app
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - JAMU_ENV=${JAMU_ENV:-prod}
