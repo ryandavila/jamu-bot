@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13.5"
 
 [[package]]
@@ -321,7 +321,7 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "discord-py", extra = ["test"] },
     { name = "mypy" },
@@ -339,19 +339,22 @@ requires-dist = [
     { name = "aiosqlite", specifier = ">=0.19.0" },
     { name = "alembic", specifier = ">=1.13.0" },
     { name = "discord-py", specifier = ">=2.3.2" },
-    { name = "discord-py", extras = ["test"], marker = "extra == 'dev'", specifier = ">=2.3.2" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.10.0" },
-    { name = "pytest-watch", marker = "extra == 'dev'", specifier = ">=4.2.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0" },
-    { name = "types-aiofiles", marker = "extra == 'dev'" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "discord-py", extras = ["test"], specifier = ">=2.3.2" },
+    { name = "mypy", specifier = ">=1.0.0" },
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.21.0" },
+    { name = "pytest-cov", specifier = ">=4.0.0" },
+    { name = "pytest-mock", specifier = ">=3.10.0" },
+    { name = "pytest-watch", specifier = ">=4.2.0" },
+    { name = "ruff", specifier = ">=0.12.7" },
+    { name = "types-aiofiles" },
+]
 
 [[package]]
 name = "mako"
