@@ -17,12 +17,16 @@ class CustomHelp(commands.Cog):
         self, ctx: commands.Context[commands.Bot], *, command: str | None = None
     ) -> None:
         """Show all available commands or get help for a specific command."""
-        if command:
-            # Show help for a specific command
-            await self._show_command_help(ctx, command)
-        else:
-            # Show all commands
-            await self._show_all_commands(ctx)
+        try:
+            if command:
+                # Show help for a specific command
+                await self._show_command_help(ctx, command)
+            else:
+                # Show all commands
+                await self._show_all_commands(ctx)
+        except Exception as e:
+            print(f"Error in custom help command: {e}")
+            await ctx.send(f"❌ Error showing help: {e}")
 
     async def _show_all_commands(self, ctx: commands.Context[commands.Bot]) -> None:
         """Show all available commands organized by category."""
@@ -32,18 +36,41 @@ class CustomHelp(commands.Cog):
             color=discord.Color.blue(),
         )
 
-        # Quote commands
+        # Check if user is admin
+        is_admin = False
+        if ctx.guild and isinstance(ctx.author, discord.Member):
+            is_admin = ctx.author.guild_permissions.administrator
+
+        # Temporary: Force non-admin view for testing (remove this line when satisfied)
+        # is_admin = False
+
+        # Quote commands (available to everyone)
         quote_commands = [
             ("`!quote`", "Get a random quote"),
             ("`!quote add <quote> - <author>`", "Add a new quote"),
             ("`!quote list [author]`", "List all quotes or by author"),
             ("`!quote search <term>`", "Search quotes"),
             ("`!quote get <id>`", "Get a specific quote by ID"),
-            ("`!quote delete <id>`", "Delete a quote (author/admin only)"),
+            ("`!quote delete <id>`", "Delete your own quotes"),
             ("`!quote random [author]`", "Get a random quote"),
-            ("`!quote export`", "Export all quotes (admin only)"),
-            ("`!quote import`", "Import quotes from CSV (admin only)"),
         ]
+
+        # Add admin-only commands if user is admin
+        if is_admin:
+            quote_commands.extend(
+                [
+                    ("`!quote export`", "Export all quotes (admin only)"),
+                    ("`!quote import`", "Import quotes from CSV (admin only)"),
+                ]
+            )
+            # Update delete description for admins
+            for i, (cmd, _) in enumerate(quote_commands):
+                if "delete" in cmd:
+                    quote_commands[i] = (
+                        cmd,
+                        "Delete any quote (admin) or your own quotes",
+                    )
+                    break
 
         quote_text = "\n".join([f"**{cmd}** - {desc}" for cmd, desc in quote_commands])
         embed.add_field(name="📝 Quote Commands", value=quote_text, inline=False)
@@ -105,6 +132,19 @@ class CustomHelp(commands.Cog):
         self, ctx: commands.Context[commands.Bot], subcommand: str
     ) -> None:
         """Show help for quote subcommands."""
+        # Check if user is admin
+        is_admin = False
+        if ctx.guild and isinstance(ctx.author, discord.Member):
+            is_admin = ctx.author.guild_permissions.administrator
+
+        # Hide admin-only commands from non-admins
+        admin_only_commands = ["export", "import"]
+        if subcommand in admin_only_commands and not is_admin:
+            await ctx.send(
+                "❌ Command not found or you don't have permission to view its help."
+            )
+            return
+
         quote_help = {
             "add": {
                 "description": "Add a new quote to the database",
