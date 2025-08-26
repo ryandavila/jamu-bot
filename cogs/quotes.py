@@ -1,5 +1,6 @@
 import csv
 import datetime
+import zoneinfo
 from io import StringIO
 
 import discord
@@ -32,6 +33,15 @@ class Quotes(commands.Cog):
         """Create a Discord embed for a quote."""
         # Use original timestamp if available, otherwise use created_at
         timestamp = quote.original_timestamp or quote.created_at
+        # Convert to Eastern Time if timestamp exists
+        if timestamp:
+            # Convert to Eastern Time (handles EST/EDT automatically)
+            et_timezone = zoneinfo.ZoneInfo("America/New_York")
+            if timestamp.tzinfo is None:
+                # Assume UTC if no timezone info
+                timestamp = timestamp.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
+            timestamp = timestamp.astimezone(et_timezone)
+
         embed = discord.Embed(
             description=f'"{quote.content}"',
             color=discord.Color.blue(),
