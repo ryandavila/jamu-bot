@@ -492,13 +492,13 @@ class Quotes(commands.Cog):
             return
 
         async with self.async_session() as session:
-            # Get accessible channel IDs
-            accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
+            # Get quotes from current channel only
+            current_channel_id = ctx.channel.id
 
             # Get count first, then select random quote by offset
             count_query = select(func.count(Quote.id)).where(
                 Quote.guild_id == ctx.guild.id,
-                Quote.channel_id.in_(accessible_channel_ids),
+                Quote.channel_id == current_channel_id,
             )
 
             if author:
@@ -523,7 +523,7 @@ class Quotes(commands.Cog):
                 select(Quote)
                 .where(
                     Quote.guild_id == ctx.guild.id,
-                    Quote.channel_id.in_(accessible_channel_ids),
+                    Quote.channel_id == current_channel_id,
                 )
                 .offset(random_offset)
                 .limit(1)
