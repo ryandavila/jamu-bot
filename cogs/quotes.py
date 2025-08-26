@@ -83,40 +83,8 @@ class Quotes(commands.Cog):
 
     @commands.hybrid_group(name="quote", invoke_without_command=True)  # type: ignore[arg-type]
     async def quote(self, ctx: commands.Context[commands.Bot]) -> None:
-        """Get a random quote."""
-        if ctx.guild is None:
-            await ctx.send("This command can only be used in a server.")
-            return
-
-        if not isinstance(ctx.author, discord.Member):
-            await ctx.send("This command can only be used by server members.")
-            return
-
-        async with self.async_session() as session:
-            # Get accessible channel IDs
-            accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
-
-            # Query for random quote from accessible channels
-            query = (
-                select(Quote)
-                .where(
-                    Quote.guild_id == ctx.guild.id,
-                    Quote.channel_id.in_(accessible_channel_ids),
-                )
-                .order_by(func.random())
-                .limit(1)
-            )
-
-            result = await session.execute(query)
-            quote = result.scalar_one_or_none()
-
-            if quote:
-                embed = self._create_quote_embed(quote)
-                await ctx.send(embed=embed)
-            else:
-                await ctx.send(
-                    "No quotes found! Add some quotes with `!quote add <quote> - <author>`."
-                )
+        """Quote command group. Use subcommands like 'add', 'random', 'list', etc."""
+        await ctx.send_help(ctx.command)
 
     @quote.command(name="add")  # type: ignore[arg-type]
     async def add_quote(
@@ -518,14 +486,37 @@ class Quotes(commands.Cog):
             # Get accessible channel IDs
             accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
 
-            # Build query based on author filter
+            # Get count first, then select random quote by offset
+            count_query = select(func.count(Quote.id)).where(
+                Quote.guild_id == ctx.guild.id,
+                Quote.channel_id.in_(accessible_channel_ids),
+            )
+
+            if author:
+                count_query = count_query.where(Quote.author.like(f"%{author}%"))
+
+            count_result = await session.execute(count_query)
+            total_quotes = count_result.scalar() or 0
+
+            if total_quotes == 0:
+                if author:
+                    await ctx.send(f"No quotes found for author '{author}'.")
+                else:
+                    await ctx.send("No quotes found.")
+                return
+
+            # Use Python's random for better randomization
+            import random
+
+            random_offset = random.randint(0, total_quotes - 1)
+
             query = (
                 select(Quote)
                 .where(
                     Quote.guild_id == ctx.guild.id,
                     Quote.channel_id.in_(accessible_channel_ids),
                 )
-                .order_by(func.random())
+                .offset(random_offset)
                 .limit(1)
             )
 
