@@ -38,7 +38,6 @@ class Quotes(commands.Cog):
             timestamp=timestamp,
         )
         embed.set_author(name=quote.author)
-        embed.set_footer(text=f"Quote #{quote.id}")
         return embed
 
     def _can_user_access_channel(self, user: discord.Member, channel_id: int) -> bool:
