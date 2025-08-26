@@ -2,4 +2,5 @@
 # Production runner script
 
 export JAMU_ENV=prod
-python bot.py
+uv run python bot.py
+

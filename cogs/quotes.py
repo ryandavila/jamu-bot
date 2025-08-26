@@ -583,11 +583,17 @@ class Quotes(commands.Cog):
                 )
 
             output.seek(0)
-            csv_data = output.getvalue()
-            file = discord.File(
-                fp=csv_data.encode(), filename=f"quotes_{ctx.guild.id}.csv"
-            )
-            await ctx.send("Here are all the quotes exported as CSV:", file=file)
+            file = discord.File(fp=output, filename=f"quotes_{ctx.guild.id}.csv")
+
+            try:
+                await ctx.author.send(
+                    "Here are all the quotes exported as CSV:", file=file
+                )
+                await ctx.send("CSV file has been sent to your DMs.")
+            except discord.Forbidden:
+                await ctx.send(
+                    "I couldn't send you a DM. Please check your privacy settings and try again."
+                )
 
     @quote.command(name="import")  # type: ignore[arg-type]
     @commands.has_permissions(administrator=True)
