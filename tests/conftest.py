@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+import discord
 from discord.ext import commands
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -161,6 +162,12 @@ def mock_member(mock_user, mock_guild):
             super().__init__()
             self.guild = mock_guild
 
+            # Mock guild permissions
+            class MockPermissions:
+                administrator = True
+
+            self.guild_permissions = MockPermissions()
+
     return MockMember()
 
 
@@ -181,6 +188,10 @@ def mock_context(mock_bot, mock_guild, mock_channel, mock_member):
             return MockMessage()
 
         async def reply(self, content=None, embed=None, mention_author=True):
+            return MockMessage()
+
+        async def send_help(self, command=None):
+            # Mock send_help for testing
             return MockMessage()
 
     class MockMessage:

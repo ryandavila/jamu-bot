@@ -112,26 +112,22 @@ class TestQuotesCog:
     @pytest.mark.asyncio
     async def test_quote_command_no_guild(self, quotes_cog, mock_context):
         mock_context.guild = None
-        mock_context.send = AsyncMock()
+        mock_context.send_help = AsyncMock()
 
         # Call the actual method directly instead of the command wrapper
         await quotes_cog.quote.callback(quotes_cog, mock_context)
 
-        mock_context.send.assert_called_once_with(
-            "This command can only be used in a server."
-        )
+        mock_context.send_help.assert_called_once_with(mock_context.command)
 
     @pytest.mark.asyncio
     async def test_quote_command_not_member(self, quotes_cog, mock_context, mock_guild):
         mock_context.guild = mock_guild
         mock_context.author = "not_a_member"  # Not a Member object
-        mock_context.send = AsyncMock()
+        mock_context.send_help = AsyncMock()
 
         await quotes_cog.quote.callback(quotes_cog, mock_context)
 
-        mock_context.send.assert_called_once_with(
-            "This command can only be used by server members."
-        )
+        mock_context.send_help.assert_called_once_with(mock_context.command)
 
     @pytest.mark.asyncio
     async def test_add_quote_no_guild(self, quotes_cog, mock_context):

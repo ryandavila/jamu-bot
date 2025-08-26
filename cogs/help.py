@@ -38,7 +38,7 @@ class CustomHelp(commands.Cog):
 
         # Check if user is admin
         is_admin = False
-        if ctx.guild and isinstance(ctx.author, discord.Member):
+        if ctx.guild and hasattr(ctx.author, "guild_permissions"):
             is_admin = ctx.author.guild_permissions.administrator
 
         # Temporary: Force non-admin view for testing (remove this line when satisfied)
@@ -134,7 +134,7 @@ class CustomHelp(commands.Cog):
         """Show help for quote subcommands."""
         # Check if user is admin
         is_admin = False
-        if ctx.guild and isinstance(ctx.author, discord.Member):
+        if ctx.guild and hasattr(ctx.author, "guild_permissions"):
             is_admin = ctx.author.guild_permissions.administrator
 
         # Hide admin-only commands from non-admins
