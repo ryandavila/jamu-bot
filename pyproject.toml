@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "jamu-bot"
 version = "0.1.0"
 description = "A Discord bot for managing quotes and more"
-requires-python = ">=3.13.5"
+requires-python = ">=3.14"
 dependencies = [
     "discord.py>=2.3.2",
     "python-dotenv>=1.0.0",
