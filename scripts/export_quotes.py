@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from config import Config
@@ -125,7 +125,7 @@ class QuoteExporter:
 
                 mdfile.write(f"## Quote #{quote.id}\n\n")
                 mdfile.write(f'> "{quote.content}"\n')
-                mdfile.write(f"> \n")
+                mdfile.write("> \n")
                 mdfile.write(f"> — **{quote.author}**\n\n")
                 mdfile.write(f"*Added: {timestamp_str}*\n\n")
                 mdfile.write("---\n\n")
