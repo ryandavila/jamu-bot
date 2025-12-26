@@ -5,5 +5,7 @@ services:
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - JAMU_ENV=${JAMU_ENV:-prod}
+    volumes:
+      - ./data:/app/data
     network_mode: host
     restart: unless-stopped
