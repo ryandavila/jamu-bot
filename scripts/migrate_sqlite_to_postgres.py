@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from bot.config import config
@@ -127,16 +127,12 @@ class SQLiteToPostgresMigrator:
         print("Verifying target database schema...")
 
         async with self.target_engine.begin() as conn:
-            # Check if quotes table exists
-            result = await conn.execute(
-                text("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables
-                        WHERE table_name = 'quotes'
-                    )
-                """)
-            )
-            table_exists = result.scalar()
+            # Use SQLAlchemy's metadata to check if table exists (works across all DBs)
+            def check_table_exists(connection):
+                # This works for both SQLite and PostgreSQL
+                return self.target_engine.dialect.has_table(connection, "quotes")
+
+            table_exists = await conn.run_sync(check_table_exists)
 
             if not table_exists:
                 print("Target database schema not found. Creating tables...")
