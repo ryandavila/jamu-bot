@@ -19,7 +19,11 @@ class Config:
         self.env: Environment = self._get_environment()
         self.discord_token: str | None = os.getenv("DISCORD_TOKEN")
         self.command_prefix: str = "?" if self.is_dev else "!"
-        self.database_path: Path = self._get_database_path()
+        self.postgres_host: str = os.getenv("POSTGRES_HOST", "postgres")
+        self.postgres_port: int = int(os.getenv("POSTGRES_PORT", "5432"))
+        self.postgres_db: str = os.getenv("POSTGRES_DB", "jamu_quotes")
+        self.postgres_user: str = os.getenv("POSTGRES_USER", "jamu_bot")
+        self.postgres_password: str | None = os.getenv("POSTGRES_PASSWORD")
 
     def _get_environment(self) -> Environment:
         """Get the current environment."""
@@ -28,13 +32,6 @@ class Config:
             return "dev"
         return "prod"
 
-    def _get_database_path(self) -> Path:
-        """Get the database path based on environment."""
-        data_dir = Path("data")
-        data_dir.mkdir(exist_ok=True)
-
-        db_name = "quotes_dev.db" if self.is_dev else "quotes.db"
-        return data_dir / db_name
 
     @property
     def is_dev(self) -> bool:
@@ -49,7 +46,12 @@ class Config:
     @property
     def database_url(self) -> str:
         """Get the database URL for SQLAlchemy."""
-        return f"sqlite+aiosqlite:///{self.database_path}"
+        if not self.postgres_password:
+            raise ValueError("POSTGRES_PASSWORD environment variable is required")
+        return (
+            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
 
     @property
     def mode_display(self) -> str:

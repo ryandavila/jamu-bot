@@ -229,7 +229,7 @@ class Quotes(commands.Cog):
             )
 
             if author:
-                query = query.where(Quote.author.like(f"%{author}%"))
+                query = query.where(Quote.author.ilike(f"%{author}%"))
 
             result = await session.execute(query)
             quotes = result.scalars().all()
@@ -403,8 +403,8 @@ class Quotes(commands.Cog):
                     Quote.guild_id == ctx.guild.id,
                     Quote.channel_id.in_(accessible_channel_ids),
                     (
-                        Quote.content.like(f"%{search_term}%")
-                        | Quote.author.like(f"%{search_term}%")
+                        Quote.content.ilike(f"%{search_term}%")
+                        | Quote.author.ilike(f"%{search_term}%")
                     ),
                 )
                 .order_by(Quote.created_at.desc())
@@ -502,7 +502,7 @@ class Quotes(commands.Cog):
             )
 
             if author:
-                count_query = count_query.where(Quote.author.like(f"%{author}%"))
+                count_query = count_query.where(Quote.author.ilike(f"%{author}%"))
 
             count_result = await session.execute(count_query)
             total_quotes = count_result.scalar() or 0
@@ -530,7 +530,7 @@ class Quotes(commands.Cog):
             )
 
             if author:
-                query = query.where(Quote.author.like(f"%{author}%"))
+                query = query.where(Quote.author.ilike(f"%{author}%"))
 
             result = await session.execute(query)
             quote = result.scalar_one_or_none()

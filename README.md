@@ -16,8 +16,9 @@ A Discord bot for storing and retrieving quotes, built with Python and discord.p
 ## Setup
 
 ### Prerequisites
-- Python 3.13+
+- Python 3.14+
 - [uv](https://docs.astral.sh/uv/) package manager
+- Docker and Docker Compose (for PostgreSQL database)
 
 ### Installation
 
@@ -33,15 +34,32 @@ A Discord bot for storing and retrieving quotes, built with Python and discord.p
 4. Create a Discord bot on the [Discord Developer Portal](https://discord.com/developers/applications)
 5. Enable the "Message Content Intent" in the Bot section
 6. Copy your bot token
-7. Create a `.env` file in the project root with:
+7. Create a `.env` file in the project root based on `.env.example`:
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env` and add your credentials:
    ```
    DISCORD_TOKEN=your_discord_token_here
+   POSTGRES_PASSWORD=your_secure_password_here
    ```
-8. Invite your bot to your server with the proper permissions (Send Messages, Read Message History, Add Reactions)
-9. Run the bot:
+8. Start the PostgreSQL database:
    ```bash
-   uv run python bot.py
+   docker compose up postgres -d
    ```
+9. Run database migrations:
+   ```bash
+   docker compose run --rm jamu-bot uv run alembic upgrade head
+   ```
+10. Invite your bot to your server with the proper permissions (Send Messages, Read Message History, Add Reactions)
+11. Run the bot:
+    ```bash
+    docker compose up jamu-bot -d
+    ```
+    Or for local development:
+    ```bash
+    uv run python bot.py
+    ```
 
 ### Development
 
@@ -102,4 +120,41 @@ make down
 
 ## Data Storage
 
-Quotes are stored in an SQLite database (`data/quotes.db`), which is automatically created when the bot first runs.
+Quotes are stored in a PostgreSQL database, which provides better reliability and data persistence for production deployments. The database is run in a Docker container with a persistent volume to prevent data loss.
+
+### Database Configuration
+
+The bot uses the following environment variables for database configuration:
+- `POSTGRES_HOST` - Database host (default: `postgres`)
+- `POSTGRES_PORT` - Database port (default: `5432`)
+- `POSTGRES_DB` - Database name (default: `jamu_quotes`)
+- `POSTGRES_USER` - Database user (default: `jamu_bot`)
+- `POSTGRES_PASSWORD` - Database password (required)
+
+### Migrating from SQLite
+
+If you have an existing SQLite database and want to migrate to PostgreSQL:
+
+1. Make sure PostgreSQL is running and migrations are applied:
+   ```bash
+   docker compose up postgres -d
+   docker compose run --rm jamu-bot uv run alembic upgrade head
+   ```
+
+2. Run the migration script (dry run first to preview):
+   ```bash
+   docker compose run --rm jamu-bot uv run python migrate_sqlite_to_postgres.py \
+     --source /app/data/quotes.db --dry-run
+   ```
+
+3. If the preview looks good, run the actual migration:
+   ```bash
+   docker compose run --rm jamu-bot uv run python migrate_sqlite_to_postgres.py \
+     --source /app/data/quotes.db
+   ```
+
+4. Verify the migration was successful:
+   ```bash
+   docker compose exec postgres psql -U jamu_bot -d jamu_quotes \
+     -c "SELECT COUNT(*) FROM quotes;"
+   ```
