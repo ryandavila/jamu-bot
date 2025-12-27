@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.14.2-slim
 
 WORKDIR /app
 
@@ -14,4 +14,4 @@ RUN uv sync --no-dev --no-editable
 # Copy application code
 COPY . .
 
-CMD ["uv", "run", "bot.py"]
+CMD ["uv", "run", "python", "-m", "bot.main"]

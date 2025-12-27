@@ -18,15 +18,10 @@ dependencies = [
 
 
 [project.scripts]
-jamu-bot = "bot:main"
+jamu-bot = "bot.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["cogs"]
-artifacts = [
-    "bot.py",
-    "data/",
-    "*.md",
-]
+packages = ["bot"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -92,6 +87,9 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:discord.ext.commands.core",
 ]
 
 [dependency-groups]

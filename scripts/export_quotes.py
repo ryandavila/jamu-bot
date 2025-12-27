@@ -14,8 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import Config
-from models import Quote
+from bot.config import Config
+from bot.models import Quote
 
 
 class QuoteExporter:

@@ -9,8 +9,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import config
-from models import Quote
+from bot.config import config
+from bot.models import Quote
 
 
 class Quotes(commands.Cog):

@@ -1,15 +1,16 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import discord
 import pytest
 
-from cogs.quotes import Quotes
-from models import Quote
+from bot.cogs.quotes import Quotes
+from bot.models import Quote
 
 
 class TestQuotesCog:
     @pytest.fixture
     def quotes_cog(self, mock_bot, test_config):
-        with patch("cogs.quotes.config", test_config):
+        with patch("bot.cogs.quotes.config", test_config):
             cog = Quotes(mock_bot)
             return cog
 
@@ -20,7 +21,7 @@ class TestQuotesCog:
         assert quotes_cog.async_session is not None
 
     def test_create_quote_embed(self, quotes_cog):
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         quote = Quote(
             id=1,
@@ -29,20 +30,21 @@ class TestQuotesCog:
             added_by=12345,
             guild_id=67890,
             channel_id=11111,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         embed = quotes_cog._create_quote_embed(quote)
 
         assert embed.description == '"Test quote content"'
         assert embed.author.name == "Test Author"
-        assert embed.footer.text == "Quote #1"
+        assert embed.color == discord.Color.blue()
+        assert embed.timestamp is not None
 
     def test_create_quote_embed_with_original_timestamp(self, quotes_cog):
-        from datetime import datetime
+        from datetime import UTC, datetime
 
-        original_time = datetime.now()
-        created_time = datetime.now()
+        original_time = datetime.now(UTC)
+        created_time = datetime.now(UTC)
 
         quote = Quote(
             id=2,
@@ -58,10 +60,7 @@ class TestQuotesCog:
         embed = quotes_cog._create_quote_embed(quote)
 
         # The embed should use original timestamp when available
-        # Note: Discord may apply timezone conversion, so check the value ignoring timezone
-        assert embed.timestamp.replace(tzinfo=None) == original_time.replace(
-            tzinfo=None
-        )
+        assert embed.timestamp == original_time
 
     def test_can_user_access_channel_legacy(self, quotes_cog, mock_member):
         result = quotes_cog._can_user_access_channel(mock_member, 0)

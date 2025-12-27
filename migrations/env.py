@@ -9,7 +9,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import your models here
-from models import Base
+from bot.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -32,7 +32,7 @@ target_metadata = Base.metadata
 
 def get_database_url() -> str:
     """Get database URL using centralized configuration."""
-    from config import config
+    from bot.config import config
 
     return config.database_url
 

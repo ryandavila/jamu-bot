@@ -11,8 +11,8 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from config import config
-from models import Base, Quote
+from bot.config import config
+from bot.models import Base, Quote
 
 
 class SQLiteToPostgresMigrator:

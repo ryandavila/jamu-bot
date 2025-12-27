@@ -11,8 +11,8 @@ from discord.ext import commands
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import Config
-from models import Base
+from bot.config import Config
+from bot.models import Base
 
 
 @pytest.fixture(scope="session")
@@ -38,22 +38,29 @@ def temp_db_path() -> Generator[Path]:
 
 @pytest.fixture
 def test_config(temp_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> Config:
-    """Create a test configuration with temporary database."""
+    """Create a test configuration with temporary SQLite database."""
     # Set environment to test
     monkeypatch.setenv("JAMU_ENV", "dev")
     monkeypatch.delenv("DISCORD_TOKEN", raising=False)
 
-    # Create config and override database path
+    # Set dummy PostgreSQL password to avoid ValueError in Config.__init__
+    monkeypatch.setenv("POSTGRES_PASSWORD", "test_password")
+
+    # For tests, we'll use a custom database URL pointing to SQLite
+    # This bypasses the normal PostgreSQL config
     config = Config()
-    config.database_path = temp_db_path
+    # Override the database_url property by storing it as an attribute
+    config._test_database_url = f"sqlite+aiosqlite:///{temp_db_path}"
 
     return config
 
 
 @pytest_asyncio.fixture
 async def test_db_engine(test_config: Config):
-    """Create a test database engine."""
-    engine = create_async_engine(test_config.database_url, echo=False)
+    """Create a test database engine using SQLite."""
+    # Use the test database URL (SQLite) instead of PostgreSQL
+    db_url = getattr(test_config, '_test_database_url', test_config.database_url)
+    engine = create_async_engine(db_url, echo=False)
 
     # Create all tables
     async with engine.begin() as conn:

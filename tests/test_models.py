@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from models import Quote
+from bot.models import Quote
 
 
 class TestQuote:

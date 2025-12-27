@@ -5,7 +5,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands
 
-from config import config
+from bot.config import config
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -32,9 +32,10 @@ async def on_ready() -> None:
     )
 
     # Load all cogs
-    for cog_file in Path("cogs").glob("*.py"):
+    cogs_path = Path(__file__).parent / "cogs"
+    for cog_file in cogs_path.glob("*.py"):
         if cog_file.name != "__init__.py":
-            cog_name: str = f"cogs.{cog_file.stem}"
+            cog_name: str = f"bot.cogs.{cog_file.stem}"
             try:
                 await bot.load_extension(cog_name)
                 logger.info(f"Loaded extension {cog_name}")

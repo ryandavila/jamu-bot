@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from cogs.help import CustomHelp
+from bot.cogs.help import CustomHelp
 
 
 class TestCustomHelp:
