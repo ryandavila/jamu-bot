@@ -13,6 +13,9 @@ sync:
 # Run all code quality checks including tests (non-mutating; used by CI)
 check: lint-check type-check test
 
+# Auto-fix formatting and lint, then type-check and run tests
+fix: format lint type-check test
+
 # Run tests with pytest
 test:
     uv run pytest tests/ -v
