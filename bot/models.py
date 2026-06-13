@@ -28,10 +28,15 @@ class Quote(Base):
     channel_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=0, index=True
     )
+    # timezone=True maps to TIMESTAMPTZ. The defaults and Discord message
+    # timestamps are timezone-aware (UTC), which asyncpg cannot store in a naive
+    # TIMESTAMP column.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
-    original_timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    original_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     def __repr__(self) -> str:
         return f"<Quote(id={self.id}, author='{self.author}', content='{self.content[:50]}...')>"
