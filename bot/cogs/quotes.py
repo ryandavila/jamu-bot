@@ -1,11 +1,12 @@
 import csv
 import datetime
 import zoneinfo
+from collections.abc import Callable
 from io import StringIO
 
 import discord
 from discord.ext import commands
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bot import database
@@ -89,6 +90,84 @@ class Quotes(commands.Cog):
                     accessible_channel_ids.append(channel.id)
 
         return accessible_channel_ids
+
+    async def _send_paginated_quotes(
+        self,
+        ctx: commands.Context[commands.Bot],
+        *,
+        base_query: Select[tuple[Quote]],
+        count_query: Select[tuple[int]],
+        title_for_page: Callable[[int, int], str],
+        color: discord.Color,
+        empty_message: str,
+        per_page: int = 5,
+    ) -> None:
+        """Send quotes from a query with reaction-based, SQL-side pagination.
+
+        Each page is fetched on demand with its own short-lived session and
+        LIMIT/OFFSET, so no connection is held while waiting on reactions and the
+        full result set is never loaded into memory at once.
+        """
+        async with self.async_session() as session:
+            total = (await session.execute(count_query)).scalar() or 0
+
+        if total == 0:
+            await ctx.send(empty_message)
+            return
+
+        total_pages = (total + per_page - 1) // per_page
+
+        async def render(page: int) -> discord.Embed:
+            async with self.async_session() as session:
+                result = await session.execute(
+                    base_query.limit(per_page).offset(page * per_page)
+                )
+                page_quotes = result.scalars().all()
+
+            embed = discord.Embed(title=title_for_page(page, total_pages), color=color)
+            for quote in page_quotes:
+                embed.add_field(
+                    name=f"#{quote.id} - {quote.author}",
+                    value=f'"{quote.content}"',
+                    inline=False,
+                )
+            return embed
+
+        if total_pages == 1:
+            await ctx.send(embed=await render(0))
+            return
+
+        current_page = 0
+        message = await ctx.send(embed=await render(current_page))
+        await message.add_reaction("⬅️")
+        await message.add_reaction("➡️")
+
+        def check(
+            reaction: discord.Reaction, user: discord.Member | discord.User
+        ) -> bool:
+            return (
+                user == ctx.author
+                and str(reaction.emoji) in ["⬅️", "➡️"]
+                and reaction.message.id == message.id
+            )
+
+        while True:
+            try:
+                reaction, user = await self.bot.wait_for(
+                    "reaction_add", timeout=60.0, check=check
+                )
+
+                if str(reaction.emoji) == "➡️" and current_page < total_pages - 1:
+                    current_page += 1
+                    await message.edit(embed=await render(current_page))
+                elif str(reaction.emoji) == "⬅️" and current_page > 0:
+                    current_page -= 1
+                    await message.edit(embed=await render(current_page))
+
+                if isinstance(user, discord.Member | discord.User):
+                    await message.remove_reaction(reaction, user)
+            except Exception:
+                break
 
     @commands.hybrid_group(name="quote", invoke_without_command=True)  # type: ignore[arg-type]
     async def quote(self, ctx: commands.Context[commands.Bot]) -> None:
@@ -214,97 +293,40 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used by server members.")
             return
 
-        async with self.async_session() as session:
-            # Get accessible channel IDs
-            accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
+        accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
+        filters: list[ColumnElement[bool]] = [
+            Quote.guild_id == ctx.guild.id,
+            Quote.channel_id.in_(accessible_channel_ids),
+        ]
+        if author:
+            filters.append(Quote.author.ilike(f"%{author}%"))
 
-            # Build query based on author filter
-            query = (
-                select(Quote)
-                .where(
-                    Quote.guild_id == ctx.guild.id,
-                    Quote.channel_id.in_(accessible_channel_ids),
-                )
-                .order_by(Quote.created_at.desc())
-            )
+        # Quote.id is a stable tiebreaker so paging stays consistent when rows
+        # share a created_at value.
+        base_query = (
+            select(Quote)
+            .where(*filters)
+            .order_by(Quote.created_at.desc(), Quote.id.desc())
+        )
+        count_query = select(func.count(Quote.id)).where(*filters)
 
+        def title_for_page(page: int, total_pages: int) -> str:
             if author:
-                query = query.where(Quote.author.ilike(f"%{author}%"))
+                return f"Quotes by {author} (Page {page + 1}/{total_pages})"
+            return f"All Quotes (Page {page + 1}/{total_pages})"
 
-            result = await session.execute(query)
-            quotes = result.scalars().all()
-
-            if not quotes:
-                if author:
-                    await ctx.send(f"No quotes found for author '{author}'.")
-                else:
-                    await ctx.send("No quotes found.")
-                return
-
-            # Pagination
-            quotes_per_page = 5
-            total_pages = (len(quotes) + quotes_per_page - 1) // quotes_per_page
-            current_page = 0
-
-            def create_page_embed(page: int) -> discord.Embed:
-                start_idx = page * quotes_per_page
-                end_idx = min(start_idx + quotes_per_page, len(quotes))
-                page_quotes = quotes[start_idx:end_idx]
-
-                if author:
-                    title = f"Quotes by {author} (Page {page + 1}/{total_pages})"
-                else:
-                    title = f"All Quotes (Page {page + 1}/{total_pages})"
-
-                embed = discord.Embed(title=title, color=discord.Color.blue())
-
-                for quote in page_quotes:
-                    embed.add_field(
-                        name=f"#{quote.id} - {quote.author}",
-                        value=f'"{quote.content}"',
-                        inline=False,
-                    )
-
-                return embed
-
-            if total_pages == 1:
-                await ctx.send(embed=create_page_embed(0))
-            else:
-                message = await ctx.send(embed=create_page_embed(current_page))
-                await message.add_reaction("⬅️")
-                await message.add_reaction("➡️")
-
-                def check(
-                    reaction: discord.Reaction, user: discord.Member | discord.User
-                ) -> bool:
-                    return (
-                        user == ctx.author
-                        and str(reaction.emoji) in ["⬅️", "➡️"]
-                        and reaction.message.id == message.id
-                    )
-
-                while True:
-                    try:
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", timeout=60.0, check=check
-                        )
-
-                        if (
-                            str(reaction.emoji) == "➡️"
-                            and current_page < total_pages - 1
-                        ):
-                            current_page += 1
-                            await message.edit(embed=create_page_embed(current_page))
-                        elif str(reaction.emoji) == "⬅️" and current_page > 0:
-                            current_page -= 1
-                            await message.edit(embed=create_page_embed(current_page))
-
-                        # Remove the user's reaction
-                        if isinstance(user, discord.Member | discord.User):
-                            await message.remove_reaction(reaction, user)
-
-                    except Exception:
-                        break
+        await self._send_paginated_quotes(
+            ctx,
+            base_query=base_query,
+            count_query=count_query,
+            title_for_page=title_for_page,
+            color=discord.Color.blue(),
+            empty_message=(
+                f"No quotes found for author '{author}'."
+                if author
+                else "No quotes found."
+            ),
+        )
 
     @quote.command(name="get")  # type: ignore[arg-type]
     async def get_quote(
@@ -392,91 +414,38 @@ class Quotes(commands.Cog):
             await ctx.send("This command can only be used by server members.")
             return
 
-        async with self.async_session() as session:
-            # Get accessible channel IDs
-            accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
+        accessible_channel_ids = await self._get_accessible_channel_ids(ctx.author)
+        filters: list[ColumnElement[bool]] = [
+            Quote.guild_id == ctx.guild.id,
+            Quote.channel_id.in_(accessible_channel_ids),
+            (
+                Quote.content.ilike(f"%{search_term}%")
+                | Quote.author.ilike(f"%{search_term}%")
+            ),
+        ]
 
-            # Build search query
-            query = (
-                select(Quote)
-                .where(
-                    Quote.guild_id == ctx.guild.id,
-                    Quote.channel_id.in_(accessible_channel_ids),
-                    (
-                        Quote.content.ilike(f"%{search_term}%")
-                        | Quote.author.ilike(f"%{search_term}%")
-                    ),
-                )
-                .order_by(Quote.created_at.desc())
+        # Quote.id is a stable tiebreaker so paging stays consistent when rows
+        # share a created_at value.
+        base_query = (
+            select(Quote)
+            .where(*filters)
+            .order_by(Quote.created_at.desc(), Quote.id.desc())
+        )
+        count_query = select(func.count(Quote.id)).where(*filters)
+
+        def title_for_page(page: int, total_pages: int) -> str:
+            return (
+                f"Search Results for '{search_term}' (Page {page + 1}/{total_pages})"
             )
 
-            result = await session.execute(query)
-            quotes = result.scalars().all()
-
-            if not quotes:
-                await ctx.send(f"No quotes found containing '{search_term}'.")
-                return
-
-            # Pagination
-            quotes_per_page = 5
-            total_pages = (len(quotes) + quotes_per_page - 1) // quotes_per_page
-            current_page = 0
-
-            def create_page_embed(page: int) -> discord.Embed:
-                start_idx = page * quotes_per_page
-                end_idx = min(start_idx + quotes_per_page, len(quotes))
-                page_quotes = quotes[start_idx:end_idx]
-
-                title = f"Search Results for '{search_term}' (Page {page + 1}/{total_pages})"
-                embed = discord.Embed(title=title, color=discord.Color.green())
-
-                for quote in page_quotes:
-                    embed.add_field(
-                        name=f"#{quote.id} - {quote.author}",
-                        value=f'"{quote.content}"',
-                        inline=False,
-                    )
-
-                return embed
-
-            if total_pages == 1:
-                await ctx.send(embed=create_page_embed(0))
-            else:
-                message = await ctx.send(embed=create_page_embed(current_page))
-                await message.add_reaction("⬅️")
-                await message.add_reaction("➡️")
-
-                def check(
-                    reaction: discord.Reaction, user: discord.Member | discord.User
-                ) -> bool:
-                    return (
-                        user == ctx.author
-                        and str(reaction.emoji) in ["⬅️", "➡️"]
-                        and reaction.message.id == message.id
-                    )
-
-                while True:
-                    try:
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", timeout=60.0, check=check
-                        )
-
-                        if (
-                            str(reaction.emoji) == "➡️"
-                            and current_page < total_pages - 1
-                        ):
-                            current_page += 1
-                            await message.edit(embed=create_page_embed(current_page))
-                        elif str(reaction.emoji) == "⬅️" and current_page > 0:
-                            current_page -= 1
-                            await message.edit(embed=create_page_embed(current_page))
-
-                        # Remove the user's reaction
-                        if isinstance(user, discord.Member | discord.User):
-                            await message.remove_reaction(reaction, user)
-
-                    except Exception:
-                        break
+        await self._send_paginated_quotes(
+            ctx,
+            base_query=base_query,
+            count_query=count_query,
+            title_for_page=title_for_page,
+            color=discord.Color.green(),
+            empty_message=f"No quotes found containing '{search_term}'.",
+        )
 
     @quote.command(name="random")  # type: ignore[arg-type]
     async def random_quote(
