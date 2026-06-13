@@ -124,12 +124,35 @@ Quotes are stored in a PostgreSQL database, which provides better reliability an
 
 ### Database Configuration
 
-The bot uses the following environment variables for database configuration:
+There are two ways to point the bot at a database:
+
+**Full connection string (managed providers like Neon).** Set `DATABASE_URL` to
+the connection string from your provider. It takes precedence over the
+`POSTGRES_*` variables, and plain `postgres://` / `postgresql://` URLs are
+rewritten to use the async driver automatically:
+
+```
+DATABASE_URL=postgresql://user:password@ep-xxx-pooler.region.aws.neon.tech/jamu_quotes?sslmode=require
+```
+
+`sslmode` (and other libpq-only query params) are translated into the driver's
+SSL settings, so Neon's required TLS works out of the box. The prepared-statement
+cache is disabled by default (`DB_STATEMENT_CACHE_SIZE=0`), which is required
+behind Neon's transaction-mode pooled endpoint.
+
+**Individual settings (local Docker Postgres).** Used when `DATABASE_URL` is not
+set:
 - `POSTGRES_HOST` - Database host (default: `postgres`)
 - `POSTGRES_PORT` - Database port (default: `5432`)
 - `POSTGRES_DB` - Database name (default: `jamu_quotes`)
 - `POSTGRES_USER` - Database user (default: `jamu_bot`)
 - `POSTGRES_PASSWORD` - Database password (required)
+
+Optional tuning: `DB_SSL` (`require`/`disable` to override TLS inference),
+`DB_STATEMENT_CACHE_SIZE`, and `DB_POOL_RECYCLE`. See `.env.example`.
+
+To run against Neon, set `DATABASE_URL`, apply migrations with
+`uv run alembic upgrade head`, then start the bot — no other changes needed.
 
 ### Migrating from SQLite
 

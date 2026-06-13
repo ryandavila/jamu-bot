@@ -6,7 +6,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 # Import your models here
 from bot.models import Base
@@ -73,13 +73,15 @@ async def run_async_migrations() -> None:
     and associate a connection with the context.
 
     """
-    configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_database_url()
+    from bot.config import config as app_config
 
-    connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    # Reuse the application's connect args (SSL, statement cache) so migrations
+    # work against managed providers like Neon, but force NullPool since this is
+    # a short-lived one-off connection.
+    connectable = create_async_engine(
+        get_database_url(),
         poolclass=pool.NullPool,
+        connect_args=app_config.connect_args,
     )
 
     async with connectable.connect() as connection:

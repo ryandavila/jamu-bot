@@ -6,23 +6,23 @@ from io import StringIO
 import discord
 from discord.ext import commands
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from bot.config import config
+from bot import database
 from bot.models import Quote
 
 
 class Quotes(commands.Cog):
     """A cog for managing and retrieving quotes."""
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(
+        self,
+        bot: commands.Bot,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
+    ) -> None:
         self.bot = bot
-        # Use centralized database configuration
-        self.engine = create_async_engine(config.database_url, echo=False)
-        self.async_session = sessionmaker(
-            self.engine, class_=AsyncSession, expire_on_commit=False
-        )
+        # Reuse the process-wide engine/pool; allow injection for tests.
+        self.async_session = session_factory or database.get_sessionmaker()
 
     async def cog_load(self) -> None:
         """Initialize the cog when loaded."""

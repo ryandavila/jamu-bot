@@ -5,6 +5,7 @@ from pathlib import Path
 import discord
 from discord.ext import commands
 
+from bot import database
 from bot.config import config
 
 logging.basicConfig(
@@ -83,6 +84,9 @@ async def main() -> None:
         logger.error(f"Database migration failed: {e}")
         return
 
+    # Initialize the shared database engine/connection pool.
+    database.init_engine()
+
     try:
         await bot.start(config.discord_token)
     except discord.errors.LoginFailure:
@@ -91,6 +95,8 @@ async def main() -> None:
         )
     except Exception as e:
         logger.error(f"An error occurred while starting the bot: {e}")
+    finally:
+        await database.dispose_engine()
 
 
 if __name__ == "__main__":

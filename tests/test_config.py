@@ -160,3 +160,68 @@ class TestConfig:
         monkeypatch.setenv("JAMU_ENV", "prod")
         config = Config()
         assert config.mode_display == "PRODUCTION"
+
+
+class TestDatabaseUrlOverride:
+    """Tests for DATABASE_URL support and managed-provider (Neon) options."""
+
+    def test_database_url_override_takes_precedence(self, monkeypatch):
+        monkeypatch.setenv(
+            "DATABASE_URL", "postgresql+asyncpg://u:p@db.example:5432/quotes"
+        )
+        # POSTGRES_* settings should be ignored when DATABASE_URL is set
+        monkeypatch.setenv("POSTGRES_HOST", "ignored")
+        monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+
+        config = Config()
+
+        assert config.database_url == "postgresql+asyncpg://u:p@db.example:5432/quotes"
+
+    def test_database_url_normalizes_scheme(self, monkeypatch):
+        # Managed providers hand out plain postgres:// / postgresql:// URLs
+        monkeypatch.setenv("DATABASE_URL", "postgres://u:p@db.example/quotes")
+        config = Config()
+        assert config.database_url.startswith("postgresql+asyncpg://")
+
+    def test_neon_sslmode_stripped_and_ssl_enabled(self, monkeypatch):
+        monkeypatch.setenv(
+            "DATABASE_URL",
+            "postgresql://u:p@ep.neon.tech/quotes?sslmode=require&channel_binding=require",
+        )
+        monkeypatch.delenv("DB_SSL", raising=False)
+        config = Config()
+
+        # libpq-only params asyncpg can't parse are removed from the URL
+        assert "sslmode" not in config.database_url
+        assert "channel_binding" not in config.database_url
+        # ...and translated into a connect arg
+        assert config.connect_args["ssl"] is True
+
+    def test_statement_cache_disabled_by_default_for_postgres(self, monkeypatch):
+        monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db.example/quotes")
+        monkeypatch.delenv("DB_STATEMENT_CACHE_SIZE", raising=False)
+        config = Config()
+        assert config.connect_args["statement_cache_size"] == 0
+
+    def test_no_ssl_for_plain_local_postgres(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("DB_SSL", raising=False)
+        monkeypatch.setenv("POSTGRES_PASSWORD", "pw")
+        config = Config()
+        assert "ssl" not in config.connect_args
+
+    def test_db_ssl_override_disable(self, monkeypatch):
+        monkeypatch.setenv(
+            "DATABASE_URL", "postgresql://u:p@ep.neon.tech/quotes?sslmode=require"
+        )
+        monkeypatch.setenv("DB_SSL", "disable")
+        config = Config()
+        assert "ssl" not in config.connect_args
+
+    def test_engine_options_include_pooling_for_postgres(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.setenv("POSTGRES_PASSWORD", "pw")
+        config = Config()
+        options = config.engine_options
+        assert options["pool_pre_ping"] is True
+        assert "connect_args" in options

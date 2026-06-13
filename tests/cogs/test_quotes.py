@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 import pytest
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from bot.cogs.quotes import Quotes
 from bot.models import Quote
@@ -10,14 +11,14 @@ from bot.models import Quote
 class TestQuotesCog:
     @pytest.fixture
     def quotes_cog(self, mock_bot, test_config):
-        with patch("bot.cogs.quotes.config", test_config):
-            cog = Quotes(mock_bot)
-            return cog
+        # Inject a SQLite-backed session factory instead of the shared engine.
+        engine = create_async_engine(test_config._test_database_url)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        return Quotes(mock_bot, session_factory=session_factory)
 
     @pytest.mark.asyncio
     async def test_cog_initialization(self, quotes_cog, mock_bot):
         assert quotes_cog.bot == mock_bot
-        assert quotes_cog.engine is not None
         assert quotes_cog.async_session is not None
 
     def test_create_quote_embed(self, quotes_cog):
