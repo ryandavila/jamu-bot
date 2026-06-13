@@ -1,7 +1,6 @@
 """Tests for configuration module."""
 
-import os
-from pathlib import Path
+import pytest
 
 from bot.config import Config
 
@@ -88,22 +87,22 @@ class TestConfig:
 
         config = Config()
 
-        expected_url = "postgresql+asyncpg://jamu_bot:test_password@localhost:5432/jamu_quotes"
+        expected_url = (
+            "postgresql+asyncpg://jamu_bot:test_password@localhost:5432/jamu_quotes"
+        )
         assert config.database_url == expected_url
         assert config.database_url.startswith("postgresql+asyncpg://")
         assert "jamu_quotes" in config.database_url
 
     def test_database_url_requires_password(self, monkeypatch):
         monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+        monkeypatch.delenv("DATABASE_URL", raising=False)
 
         config = Config()
 
         # Should raise ValueError when accessing database_url without password
-        try:
+        with pytest.raises(ValueError, match="POSTGRES_PASSWORD"):
             _ = config.database_url
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "POSTGRES_PASSWORD" in str(e)
 
     def test_discord_token_none_when_not_set(self, monkeypatch):
         monkeypatch.delenv("DISCORD_TOKEN", raising=False)

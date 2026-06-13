@@ -59,7 +59,7 @@ def test_config(temp_db_path: Path, monkeypatch: pytest.MonkeyPatch) -> Config:
 async def test_db_engine(test_config: Config):
     """Create a test database engine using SQLite."""
     # Use the test database URL (SQLite) instead of PostgreSQL
-    db_url = getattr(test_config, '_test_database_url', test_config.database_url)
+    db_url = getattr(test_config, "_test_database_url", test_config.database_url)
     engine = create_async_engine(db_url, echo=False)
 
     # Create all tables

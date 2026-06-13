@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:18
     container_name: jamu-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-jamu_quotes}

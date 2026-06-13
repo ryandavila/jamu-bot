@@ -4,9 +4,7 @@
 import argparse
 import asyncio
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -36,7 +34,7 @@ class SQLiteToPostgresMigrator:
 
     async def migrate(self, dry_run: bool = False, batch_size: int = 1000) -> None:
         """Execute the migration process."""
-        print(f"Starting migration from SQLite to PostgreSQL...")
+        print("Starting migration from SQLite to PostgreSQL...")
         print(f"Source: {self.source_db_path}")
         print(f"Target: {self.target_db_url}")
         print()
@@ -87,7 +85,9 @@ class SQLiteToPostgresMigrator:
             batch_num = (i // batch_size) + 1
             total_batches = (source_count + batch_size - 1) // batch_size
 
-            print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} quotes)...")
+            print(
+                f"Processing batch {batch_num}/{total_batches} ({len(batch)} quotes)..."
+            )
 
             batch_imported, batch_skipped = await self._migrate_batch(
                 batch, dry_run=dry_run
@@ -187,7 +187,9 @@ class SQLiteToPostgresMigrator:
 
                 # Commit the batch
                 await target.commit()
-                print(f"  ✓ Imported {imported_count} quotes, skipped {skipped_count} duplicates")
+                print(
+                    f"  ✓ Imported {imported_count} quotes, skipped {skipped_count} duplicates"
+                )
 
             except Exception as e:
                 await target.rollback()
@@ -257,6 +259,7 @@ async def main() -> None:
         print()
         print(f"✗ Migration failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     finally:

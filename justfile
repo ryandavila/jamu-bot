@@ -10,8 +10,8 @@ install:
 sync:
     uv sync --extra dev
 
-# Run all code quality checks including tests
-check: lint type-check test
+# Run all code quality checks including tests (non-mutating; used by CI)
+check: lint-check type-check test
 
 # Run tests with pytest
 test:
@@ -38,9 +38,14 @@ test-watch:
 lint:
     uv run ruff check --fix .
 
-# Run mypy type checking
+# Run ruff lint + format checks without modifying files (used by CI)
+lint-check:
+    uv run ruff check .
+    uv run ruff format --check .
+
+# Run mypy type checking (application code)
 type-check:
-    uv run mypy .
+    uv run mypy bot
 
 # Format code with ruff
 format:

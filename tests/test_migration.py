@@ -1,5 +1,6 @@
 """Tests for SQLite to PostgreSQL migration script."""
 
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,10 +12,10 @@ from sqlalchemy.orm import sessionmaker
 
 from bot.models import Base, Quote
 
-# Import the migration class
-import sys
+# The migration script lives in scripts/, which is not an installed package.
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from migrate_sqlite_to_postgres import SQLiteToPostgresMigrator
+
+from migrate_sqlite_to_postgres import SQLiteToPostgresMigrator  # noqa: E402
 
 
 @pytest.fixture
@@ -260,7 +261,9 @@ class TestMigration:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async_session = sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
         async with async_session() as session:
             # Add 10 quotes
             for i in range(10):
