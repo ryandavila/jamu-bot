@@ -22,5 +22,5 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run checks (lint, type-check, tests)
+      - name: Run checks (lint, typecheck, tests)
         run: just check

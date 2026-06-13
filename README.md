@@ -72,12 +72,12 @@ just
 # Complete development setup (install deps, create .env)
 just dev-setup
 
-# Run all code quality checks (lint, type-check, tests)
+# Run all code quality checks (lint, typecheck, tests)
 just check
 
 # Individually
 just lint        # ruff lint with autofix
-just type-check  # ty on the bot package
+just typecheck   # ty on the bot package
 just test        # run the test suite
 
 # Run the bot locally

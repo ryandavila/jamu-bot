@@ -11,10 +11,10 @@ sync:
     uv sync --extra dev
 
 # Run all code quality checks including tests (non-mutating; used by CI)
-check: lint-check type-check test
+check: lint-check typecheck test
 
-# Auto-fix formatting and lint, then type-check and run tests
-fix: format lint type-check test
+# Auto-fix formatting and lint, then typecheck and run tests
+fix: format lint typecheck test
 
 # Run tests with pytest
 test:
@@ -47,7 +47,7 @@ lint-check:
     uv run ruff format --check .
 
 # Run ty type checking (application code)
-type-check:
+typecheck:
     uv run ty check bot
 
 # Format code with ruff
@@ -118,7 +118,7 @@ dev-setup: sync env-example
     @echo "1. Edit .env with your Discord token"
     @echo "2. Run 'just run-dev' to start the bot"
 
-# Run pre-commit checks (lint + type-check)
+# Run pre-commit checks (lint + typecheck)
 pre-commit: check
     @echo "All checks passed!"
 
