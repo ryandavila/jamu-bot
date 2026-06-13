@@ -58,51 +58,36 @@ A Discord bot for storing and retrieving quotes, built with Python and discord.p
     ```
     Or for local development:
     ```bash
-    uv run python bot.py
+    uv run python -m bot.main
     ```
 
 ### Development
 
-For development with type checking:
-```bash
-# Install development dependencies
-uv sync --group dev
-
-# Run type checking
-uv run mypy .
-
-# Run linting
-uv run ruff check .
-```
-
-### Using the Makefile
-
-A Makefile is provided for common development tasks:
+Common tasks are available via [just](https://github.com/casey/just):
 
 ```bash
-# Show all available commands
-make help
+# Show all available recipes
+just
 
-# Complete development setup
-make dev-setup
+# Complete development setup (install deps, create .env)
+just dev-setup
 
-# Install dependencies
-make install-dev
+# Run all code quality checks (lint, type-check, tests)
+just check
 
-# Run code quality checks
-make check
+# Individually
+just lint        # ruff lint with autofix
+just type-check  # mypy on the bot package
+just test        # run the test suite
 
-# Run the bot in development mode
-make run-dev
+# Run the bot locally
+just run         # production mode
+just run-dev     # development mode
 
-# Run the bot in production mode
-make run
-
-# Docker commands
-make build
-make up
-make logs
-make down
+# Docker
+just up          # start with docker compose
+just logs        # tail logs
+just down        # stop and remove containers
 ```
 
 ## Commands
@@ -166,13 +151,13 @@ If you have an existing SQLite database and want to migrate to PostgreSQL:
 
 2. Run the migration script (dry run first to preview):
    ```bash
-   docker compose run --rm jamu-bot uv run python migrate_sqlite_to_postgres.py \
+   docker compose run --rm jamu-bot uv run python scripts/migrate_sqlite_to_postgres.py \
      --source /app/data/quotes.db --dry-run
    ```
 
 3. If the preview looks good, run the actual migration:
    ```bash
-   docker compose run --rm jamu-bot uv run python migrate_sqlite_to_postgres.py \
+   docker compose run --rm jamu-bot uv run python scripts/migrate_sqlite_to_postgres.py \
      --source /app/data/quotes.db
    ```
 

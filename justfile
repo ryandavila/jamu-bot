@@ -53,11 +53,11 @@ format:
 
 # Run the bot in production mode
 run:
-    uv run python bot.py
+    uv run python -m bot.main
 
 # Run the bot in development mode
 run-dev:
-    uv run python bot.py --dev
+    JAMU_ENV=dev uv run python -m bot.main
 
 # Rebuild and start Docker container (pass service=jamu-bot-dev for dev mode)
 rebuild service="jamu-bot":

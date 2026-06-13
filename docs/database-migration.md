@@ -4,7 +4,7 @@ This guide explains how to migrate data from an old SQLite database to the curre
 
 ## Overview
 
-The `migrate_db.py` script allows you to import quotes from an old SQLite database into your current database. This is useful when:
+The `scripts/migrate_sqlite_to_postgres.py` script allows you to import quotes from an old SQLite database into your current database. This is useful when:
 - Deploying the bot on a new device
 - Migrating from an older version of the bot
 - Restoring from a backup database
@@ -22,7 +22,7 @@ The `migrate_db.py` script allows you to import quotes from an old SQLite databa
 Always start with a dry run to see what data would be migrated:
 
 ```bash
-uv run python migrate_db.py /path/to/old/database.db --dry-run
+uv run python scripts/migrate_sqlite_to_postgres.py --source /path/to/old/database.db --dry-run
 ```
 
 This will:
@@ -36,7 +36,7 @@ This will:
 Once you're satisfied with the dry run results:
 
 ```bash
-uv run python migrate_db.py /path/to/old/database.db
+uv run python scripts/migrate_sqlite_to_postgres.py --source /path/to/old/database.db
 ```
 
 You'll be prompted to confirm before the migration proceeds.
@@ -45,16 +45,27 @@ You'll be prompted to confirm before the migration proceeds.
 
 #### Migrate to a Specific Database
 
-By default, the script uses your current environment's database (dev/prod based on `JAMU_ENV`). To migrate to a specific database:
+By default, the script targets the database from your configuration
+(`DATABASE_URL`, or the `POSTGRES_*` settings). To target a different database,
+pass an explicit SQLAlchemy URL:
 
 ```bash
-uv run python migrate_db.py /path/to/old/database.db --target-db "sqlite+aiosqlite:///path/to/target.db"
+uv run python scripts/migrate_sqlite_to_postgres.py --source /path/to/old/database.db \
+  --target "postgresql+asyncpg://user:password@host:5432/dbname"
+```
+
+#### Tune the Batch Size
+
+Quotes are imported in batches (default 1000). Adjust with `--batch-size`:
+
+```bash
+uv run python scripts/migrate_sqlite_to_postgres.py --source /path/to/old/database.db --batch-size 500
 ```
 
 #### Get Help
 
 ```bash
-uv run python migrate_db.py --help
+uv run python scripts/migrate_sqlite_to_postgres.py --help
 ```
 
 ## Migration Process
