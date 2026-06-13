@@ -68,9 +68,12 @@ async def on_command_error(
         await ctx.send(f"Missing required argument: {error.param.name}")
     elif isinstance(error, commands.BadArgument):
         await ctx.send(f"Bad argument: {error}")
+    elif isinstance(error, commands.CheckFailure):
+        await ctx.send("You don't have permission to use that command.")
     else:
-        logger.error(f"Error in {ctx.command}: {error}")
-        await ctx.send(f"An error occurred: {error}")
+        # Log the full traceback, but don't leak internal error details to users.
+        logger.error("Error in command %s", ctx.command, exc_info=error)
+        await ctx.send("An unexpected error occurred. Please try again later.")
 
 
 async def main() -> None:
