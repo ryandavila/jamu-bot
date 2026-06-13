@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import BigInteger, DateTime, Integer, String, Text
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -21,10 +21,12 @@ class Quote(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     author: Mapped[str] = mapped_column(String(255), nullable=False)
-    added_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    guild_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    # Discord IDs are 64-bit snowflakes and overflow a 32-bit INTEGER on
+    # PostgreSQL, so these must be BigInteger.
+    added_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    guild_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     channel_id: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, index=True
+        BigInteger, nullable=False, default=0, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(UTC)
