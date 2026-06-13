@@ -31,8 +31,6 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-jamu_quotes}
       - POSTGRES_USER=${POSTGRES_USER:-jamu_bot}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - ./data:/app/data
     restart: unless-stopped
 
 volumes:

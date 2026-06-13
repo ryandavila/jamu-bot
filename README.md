@@ -149,15 +149,19 @@ If you have an existing SQLite database and want to migrate to PostgreSQL:
    docker compose run --rm jamu-bot uv run alembic upgrade head
    ```
 
-2. Run the migration script (dry run first to preview):
+2. Place your old SQLite database in the `./data` directory and run the
+   migration script (dry run first to preview). The `--volume` flag mounts
+   `./data` into the one-off container:
    ```bash
-   docker compose run --rm jamu-bot uv run python scripts/migrate_sqlite_to_postgres.py \
+   docker compose run --rm --volume "$(pwd)/data:/app/data" jamu-bot \
+     uv run python scripts/migrate_sqlite_to_postgres.py \
      --source /app/data/quotes.db --dry-run
    ```
 
 3. If the preview looks good, run the actual migration:
    ```bash
-   docker compose run --rm jamu-bot uv run python scripts/migrate_sqlite_to_postgres.py \
+   docker compose run --rm --volume "$(pwd)/data:/app/data" jamu-bot \
+     uv run python scripts/migrate_sqlite_to_postgres.py \
      --source /app/data/quotes.db
    ```
 
