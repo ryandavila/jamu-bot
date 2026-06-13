@@ -21,6 +21,19 @@ intents.members = True
 bot: commands.Bot = commands.Bot(command_prefix=config.command_prefix, intents=intents)
 
 
+def _run_migrations() -> None:
+    """Apply Alembic migrations up to head (synchronous)."""
+    from alembic import command
+    from alembic.config import Config as AlembicConfig
+
+    root = Path(__file__).resolve().parent.parent
+    alembic_cfg = AlembicConfig(str(root / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(root / "migrations"))
+    # Don't let Alembic reconfigure the root logger; keep the bot's logging.
+    alembic_cfg.attributes["configure_logging"] = False
+    command.upgrade(alembic_cfg, "head")
+
+
 @bot.event
 async def on_ready() -> None:
     """Event triggered when the bot is ready."""
@@ -68,18 +81,12 @@ async def main() -> None:
         )
         return
 
-    # Run database migrations before starting the bot
+    # Run database migrations before starting the bot. Alembic's env.py drives
+    # an async engine via asyncio.run(), so run it in a worker thread to avoid
+    # nesting event loops inside this already-running loop.
     try:
-        import subprocess
-
-        # Run Alembic migrations
-        cmd = ["uv", "run", "alembic", "upgrade", "head"]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error(f"Alembic migration failed: {result.stderr}")
-            return
-        else:
-            logger.info("Database migrations completed successfully")
+        await asyncio.to_thread(_run_migrations)
+        logger.info("Database migrations completed successfully")
     except Exception as e:
         logger.error(f"Database migration failed: {e}")
         return
