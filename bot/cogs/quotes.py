@@ -2,7 +2,7 @@ import csv
 import datetime
 import zoneinfo
 from collections.abc import Callable
-from io import StringIO
+from io import BytesIO, StringIO
 
 import discord
 from discord.ext import commands
@@ -434,9 +434,7 @@ class Quotes(commands.Cog):
         count_query = select(func.count(Quote.id)).where(*filters)
 
         def title_for_page(page: int, total_pages: int) -> str:
-            return (
-                f"Search Results for '{search_term}' (Page {page + 1}/{total_pages})"
-            )
+            return f"Search Results for '{search_term}' (Page {page + 1}/{total_pages})"
 
         await self._send_paginated_quotes(
             ctx,
@@ -551,8 +549,9 @@ class Quotes(commands.Cog):
                     ]
                 )
 
-            output.seek(0)
-            file = discord.File(fp=output, filename=f"quotes_{ctx.guild.id}.csv")
+            # discord.File needs a binary stream, so encode the CSV text.
+            data = BytesIO(output.getvalue().encode("utf-8"))
+            file = discord.File(fp=data, filename=f"quotes_{ctx.guild.id}.csv")
 
             try:
                 await ctx.author.send(
