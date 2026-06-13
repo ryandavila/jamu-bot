@@ -12,7 +12,7 @@ class CustomHelp(commands.Cog):
         # Remove the default help command so we can replace it
         self.bot.remove_command("help")
 
-    @commands.hybrid_command(name="help")  # type: ignore[arg-type]
+    @commands.hybrid_command(name="help")  # ty: ignore[invalid-argument-type]
     async def help_command(
         self, ctx: commands.Context[commands.Bot], *, command: str | None = None
     ) -> None:
@@ -38,7 +38,7 @@ class CustomHelp(commands.Cog):
 
         # Check if user is admin
         is_admin = False
-        if ctx.guild and hasattr(ctx.author, "guild_permissions"):
+        if ctx.guild and isinstance(ctx.author, discord.Member):
             is_admin = ctx.author.guild_permissions.administrator
 
         # Temporary: Force non-admin view for testing (remove this line when satisfied)
@@ -114,7 +114,7 @@ class CustomHelp(commands.Cog):
         if cmd.usage:
             embed.add_field(name="Usage", value=f"`!{cmd.usage}`", inline=False)
 
-        if hasattr(cmd, "commands") and cmd.commands:
+        if isinstance(cmd, commands.Group):
             # This is a group command, show subcommands
             subcommands = []
             for subcmd in cmd.commands:
@@ -134,7 +134,7 @@ class CustomHelp(commands.Cog):
         """Show help for quote subcommands."""
         # Check if user is admin
         is_admin = False
-        if ctx.guild and hasattr(ctx.author, "guild_permissions"):
+        if ctx.guild and isinstance(ctx.author, discord.Member):
             is_admin = ctx.author.guild_permissions.administrator
 
         # Hide admin-only commands from non-admins

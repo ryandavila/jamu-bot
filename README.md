@@ -77,7 +77,7 @@ just check
 
 # Individually
 just lint        # ruff lint with autofix
-just type-check  # mypy on the bot package
+just type-check  # ty on the bot package
 just test        # run the test suite
 
 # Run the bot locally

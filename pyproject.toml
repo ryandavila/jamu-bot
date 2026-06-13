@@ -23,30 +23,6 @@ jamu-bot = "bot.main:main"
 [tool.hatch.build.targets.wheel]
 packages = ["bot"]
 
-[tool.mypy]
-python_version = "3.13"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-show_error_codes = true
-
-[[tool.mypy.overrides]]
-module = "discord.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "asyncpg.*"
-ignore_missing_imports = true
-
 [tool.ruff]
 target-version = "py313"
 line-length = 88
@@ -94,8 +70,6 @@ filterwarnings = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.0.0",
-    "types-aiofiles",
     "ruff>=0.12.7",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
@@ -103,4 +77,5 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-watch>=4.2.0",
     "discord.py[test]>=2.3.2",
+    "ty>=0.0.49",
 ]

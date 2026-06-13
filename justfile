@@ -43,9 +43,9 @@ lint-check:
     uv run ruff check .
     uv run ruff format --check .
 
-# Run mypy type checking (application code)
+# Run ty type checking (application code)
 type-check:
-    uv run mypy bot
+    uv run ty check bot
 
 # Format code with ruff
 format:
@@ -100,7 +100,7 @@ status:
 # Clean up cache files
 clean:
     find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name ".ty_cache" -exec rm -rf {} + 2>/dev/null || true
     find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
     find . -name "*.pyc" -delete 2>/dev/null || true
 

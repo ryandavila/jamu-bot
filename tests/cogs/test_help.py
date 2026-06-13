@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import discord
 import pytest
 
 from bot.cogs.help import CustomHelp
@@ -209,6 +210,9 @@ class TestCustomHelp:
     @pytest.mark.asyncio
     async def test_show_quote_subcommand_help_export(self, help_cog, mock_context):
         mock_context.send = AsyncMock()
+        # export help is admin-only; author must be an admin Member.
+        mock_context.author = MagicMock(spec=discord.Member)
+        mock_context.author.guild_permissions.administrator = True
 
         await help_cog._show_quote_subcommand_help(mock_context, "export")
 
@@ -221,6 +225,9 @@ class TestCustomHelp:
     @pytest.mark.asyncio
     async def test_show_quote_subcommand_help_import(self, help_cog, mock_context):
         mock_context.send = AsyncMock()
+        # import help is admin-only; author must be an admin Member.
+        mock_context.author = MagicMock(spec=discord.Member)
+        mock_context.author.guild_permissions.administrator = True
 
         await help_cog._show_quote_subcommand_help(mock_context, "import")
 

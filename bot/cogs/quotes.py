@@ -169,12 +169,12 @@ class Quotes(commands.Cog):
             except Exception:
                 break
 
-    @commands.hybrid_group(name="quote", invoke_without_command=True)  # type: ignore[arg-type]
+    @commands.hybrid_group(name="quote", invoke_without_command=True)  # ty: ignore[invalid-argument-type]
     async def quote(self, ctx: commands.Context[commands.Bot]) -> None:
         """Quote command group. Use subcommands like 'add', 'random', 'list', etc."""
         await ctx.send_help(ctx.command)
 
-    @quote.command(name="add")  # type: ignore[arg-type]
+    @quote.command(name="add")  # ty: ignore[invalid-argument-type]
     async def add_quote(
         self, ctx: commands.Context[commands.Bot], *, content: str | None = None
     ) -> None:
@@ -275,7 +275,7 @@ class Quotes(commands.Cog):
         # Reply in thread if possible, otherwise regular reply
         await ctx.reply(f"Quote by {author} has been added!", mention_author=False)
 
-    @quote.command(name="list")  # type: ignore[arg-type]
+    @quote.command(name="list")  # ty: ignore[invalid-argument-type]
     async def list_quotes(
         self, ctx: commands.Context[commands.Bot], *, author: str | None = None
     ) -> None:
@@ -328,7 +328,7 @@ class Quotes(commands.Cog):
             ),
         )
 
-    @quote.command(name="get")  # type: ignore[arg-type]
+    @quote.command(name="get")  # ty: ignore[invalid-argument-type]
     async def get_quote(
         self, ctx: commands.Context[commands.Bot], quote_id: int
     ) -> None:
@@ -358,7 +358,7 @@ class Quotes(commands.Cog):
             else:
                 await ctx.send(f"Quote with ID {quote_id} not found.")
 
-    @quote.command(name="delete", aliases=["remove"])  # type: ignore[arg-type]
+    @quote.command(name="delete", aliases=["remove"])  # ty: ignore[invalid-argument-type]
     async def delete_quote(
         self, ctx: commands.Context[commands.Bot], quote_id: int
     ) -> None:
@@ -401,7 +401,7 @@ class Quotes(commands.Cog):
 
             await ctx.send(f"Quote #{quote_id} has been deleted.")
 
-    @quote.command(name="search")  # type: ignore[arg-type]
+    @quote.command(name="search")  # ty: ignore[invalid-argument-type]
     async def search_quotes(
         self, ctx: commands.Context[commands.Bot], *, search_term: str
     ) -> None:
@@ -445,7 +445,7 @@ class Quotes(commands.Cog):
             empty_message=f"No quotes found containing '{search_term}'.",
         )
 
-    @quote.command(name="random")  # type: ignore[arg-type]
+    @quote.command(name="random")  # ty: ignore[invalid-argument-type]
     async def random_quote(
         self, ctx: commands.Context[commands.Bot], *, author: str | None = None
     ) -> None:
@@ -511,7 +511,7 @@ class Quotes(commands.Cog):
                 else:
                     await ctx.send("No quotes found.")
 
-    @quote.command(name="export")  # type: ignore[arg-type]
+    @quote.command(name="export")  # ty: ignore[invalid-argument-type]
     @commands.has_permissions(administrator=True)
     async def export_quotes(self, ctx: commands.Context[commands.Bot]) -> None:
         """Export all quotes to a CSV file. Admin only."""
@@ -563,7 +563,7 @@ class Quotes(commands.Cog):
                     "I couldn't send you a DM. Please check your privacy settings and try again."
                 )
 
-    @quote.command(name="import")  # type: ignore[arg-type]
+    @quote.command(name="import")  # ty: ignore[invalid-argument-type]
     @commands.has_permissions(administrator=True)
     async def import_quotes(self, ctx: commands.Context[commands.Bot]) -> None:
         """Import quotes from a CSV file. Admin only."""
